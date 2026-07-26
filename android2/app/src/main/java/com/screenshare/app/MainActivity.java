@@ -6,15 +6,18 @@ import android.content.DialogInterface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 public class MainActivity extends Activity {
     
+    private static final String TAG = "ScreenShare";
     private WebView webView;
     private Handler mainHandler;
     private boolean atHome = true;
@@ -47,8 +50,24 @@ public class MainActivity extends Activity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        settings.setAllowFileAccess(true);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         
-        webView.setWebViewClient(new WebViewClient());
+        // Enable console logging
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onConsoleMessage(android.webkit.ConsoleMessage msg) {
+                Log.d(TAG, "JS: " + msg.message());
+            }
+        });
+        
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                Log.e(TAG, "WebView error: " + description);
+            }
+        });
+        
         webView.setBackgroundColor(0xFF0D1117);
         
         // JS interface for page tracking
@@ -60,15 +79,21 @@ public class MainActivity extends Activity {
                     reapplyFullscreen();
                 });
             }
+            @android.webkit.JavascriptInterface
+            public void log(String msg) {
+                Log.d(TAG, "App: " + msg);
+            }
         }, "Android");
         
-        webView.loadUrl("file:///android_asset/index.html");
-        // If no assets, load inline
+        // Load the HTML directly
         webView.loadDataWithBaseURL(null, getHTML(), "text/html", "UTF-8", null);
+        
+        Log.d(TAG, "App started, HTML loaded");
     }
     
     @Override
     public void onBackPressed() {
+        Log.d(TAG, "Back pressed, atHome=" + atHome);
         if (atHome) {
             new AlertDialog.Builder(this)
                 .setTitle("Exit")
@@ -84,28 +109,40 @@ public class MainActivity extends Activity {
     
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
-        // Only send touch when on screen view (connected)
+        // Forward touch to WebView for button clicks, etc.
+        // Only send server touch when on screen view (not at home)
+        
         if (!atHome) {
             float x = event.getX();
             float y = event.getY();
             float vw = webView.getWidth();
             float vh = webView.getHeight();
             
-            float nx = Math.max(0, Math.min(1, x / vw));
-            float ny = Math.max(0, Math.min(1, y / vh));
-            
-            String type = "";
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_DOWN: type = "touch_start"; break;
-                case MotionEvent.ACTION_MOVE: type = "touch_move"; break;
-                case MotionEvent.ACTION_UP: type = "touch_end"; break;
-            }
-            
-            if (!type.isEmpty()) {
-                final String js = "sendTouchToServer('" + type + "'," + nx + "," + ny + ")";
-                mainHandler.post(() -> {
-                    try { webView.evaluateJavascript(js, null); } catch (Exception e) {}
-                });
+            if (vw > 0 && vh > 0) {
+                float nx = Math.max(0, Math.min(1, x / vw));
+                float ny = Math.max(0, Math.min(1, y / vh));
+                
+                String type = "";
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN: type = "touch_start"; break;
+                    case MotionEvent.ACTION_MOVE: type = "touch_move"; break;
+                    case MotionEvent.ACTION_UP: type = "touch_end"; break;
+                }
+                
+                if (!type.isEmpty()) {
+                    final String js = "sendTouchToServer('" + type + "'," + nx + "," + ny + ")";
+                    final float finalNx = nx;
+                    final float finalNy = ny;
+                    mainHandler.post(() -> {
+                        try {
+                            webView.evaluateJavascript(js, value -> {
+                                Log.d(TAG, "Touch sent: " + type + " at " + finalNx + "," + finalNy);
+                            });
+                        } catch (Exception e) {
+                            Log.e(TAG, "Touch error: " + e.getMessage());
+                        }
+                    });
+                }
             }
         }
         
@@ -133,14 +170,15 @@ public class MainActivity extends Activity {
     
     private String getHTML() {
         return "<!DOCTYPE html><html><head>" +
+        "<meta charset='UTF-8'>" +
         "<meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'>" +
         "<style>" +
         "*{margin:0;padding:0;box-sizing:border-box;}" +
-        "html,body{background:#0D1117;color:#e0e0e0;font-family:-apple-system,sans-serif;height:100%;overflow:hidden;touch-action:none;}" +
+        "html,body{background:#0D1117;color:#e0e0e0;font-family:-apple-system,sans-serif;height:100%;overflow:hidden;}" +
 
         /* TOPBAR */
         ".topbar{display:flex;align-items:center;padding:6px 10px;background:#161B22;border-bottom:1px solid #1a508b;height:44px;flex-shrink:0;}" +
-        ".hamburger{background:none;border:none;color:#00D4FF;font-size:20px;padding:4px 6px;cursor:pointer;}" +
+        ".hamburger{background:none;border:none;color:#00D4FF;font-size:20px;padding:4px 6px;cursor:pointer;-webkit-tap-highlight-color:transparent;}" +
         ".topbar-title{flex:1;text-align:center;}" +
         ".topbar-title h1{color:#00D4FF;font-size:14px;}" +
         ".topbar-title .sub{color:#888;font-size:8px;}" +
@@ -156,18 +194,20 @@ public class MainActivity extends Activity {
         ".sidebar-header h2{color:#00D4FF;font-size:16px;}" +
         ".sidebar-header .author{color:#888;font-size:10px;margin-top:3px;}" +
         ".sidebar-header .author a{color:#00D4FF;text-decoration:none;}" +
-        ".sidebar-item{display:flex;align-items:center;padding:12px 16px;border:none;background:none;color:#e0e0e0;font-size:13px;text-align:left;width:100%;border-bottom:1px solid #1a508b33;cursor:pointer;}" +
+        ".sidebar-item{display:flex;align-items:center;padding:12px 16px;border:none;background:none;color:#e0e0e0;font-size:13px;text-align:left;width:100%;border-bottom:1px solid #1a508b33;cursor:pointer;-webkit-tap-highlight-color:transparent;}" +
         ".sidebar-item:active{background:#0f3460;}" +
         ".sidebar-footer{margin-top:auto;padding:10px 16px;border-top:1px solid #1a508b;color:#888;font-size:9px;text-align:center;}" +
 
         /* HOME */
-        ".home{display:flex;flex-direction:column;height:100%;overflow-y:auto;}" +
+        ".home{display:flex;flex-direction:column;height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;}" +
         ".card{background:#161B22;border:1px solid #1a508b;border-radius:8px;padding:10px;margin:8px;}" +
-        "input,select{width:100%;padding:8px;background:#0f3460;border:1px solid #1a508b;border-radius:6px;color:white;font-size:13px;margin-bottom:6px;}" +
+        "input,select{width:100%;padding:10px;background:#0f3460;border:1px solid #1a508b;border-radius:6px;color:white;font-size:14px;margin-bottom:8px;-webkit-appearance:none;}" +
         "input:focus{outline:none;border-color:#00D4FF;}" +
-        "#status{text-align:center;font-size:11px;padding:4px;}" +
+        "#status{text-align:center;font-size:12px;padding:6px;}" +
         ".online{color:#4ADE80;} .offline{color:#F87171;} .connecting{color:#FBBF24;}" +
-        "#toggleBtn{width:100%;padding:12px;border:none;border-radius:8px;font-size:15px;font-weight:bold;cursor:pointer;transition:all .2s;}" +
+
+        /* BIG CONNECT BUTTON */
+        "#toggleBtn{width:100%;padding:16px;border:none;border-radius:10px;font-size:18px;font-weight:bold;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .2s;}" +
         ".btn-connect{background:#00D4FF;color:#0D1117;}" +
         ".btn-disconnect{background:#F87171;color:white;}" +
         ".btn-connecting{background:#FBBF24;color:#0D1117;}" +
@@ -178,20 +218,25 @@ public class MainActivity extends Activity {
         ".scan-item{background:#161B22;border:1px solid #1a508b;border-radius:6px;padding:8px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}" +
         ".scan-ip{color:#00D4FF;font-family:monospace;font-size:12px;}" +
         ".scan-name{color:#888;font-size:9px;}" +
-        ".scan-connect{background:#00D4FF;border:none;color:#0D1117;padding:5px 10px;border-radius:4px;font-size:10px;font-weight:bold;cursor:pointer;}" +
-        ".scan-refresh{background:none;border:1px solid #1a508b;color:#00D4FF;padding:4px 10px;border-radius:4px;font-size:10px;cursor:pointer;margin-top:4px;}" +
+        ".scan-connect{background:#00D4FF;border:none;color:#0D1117;padding:6px 12px;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;}" +
+        ".scan-refresh{background:none;border:1px solid #1a508b;color:#00D4FF;padding:5px 12px;border-radius:4px;font-size:10px;cursor:pointer;margin-top:4px;}" +
         ".scan-status{color:#FBBF24;font-size:10px;}" +
 
         ".info{font-size:9px;color:#888;line-height:1.3;}" +
         ".info b{color:#00D4FF;}" +
 
+        /* FOOTER */
+        ".footer{text-align:center;padding:12px;margin-top:auto;}" +
+        ".footer .ver{color:#888;font-size:10px;}" +
+        ".footer .author{margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;}" +
+        ".footer .name{color:#e0e0e0;font-size:12px;}" +
+        ".footer .name b{color:#00D4FF;}" +
+        ".footer .tg{display:inline-flex;align-items:center;gap:3px;text-decoration:none;}" +
+
         /* SCREEN */
-        "#screenView{display:none;flex:1;flex-direction:column;overflow:hidden;position:relative;background:#000;touch-action:none;}" +
+        "#screenView{display:none;flex:1;flex-direction:column;overflow:hidden;position:relative;background:#000;}" +
         "#screenContainer{flex:1;overflow:hidden;position:relative;touch-action:none;}" +
         "#screenImg{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;touch-action:none;user-select:none;-webkit-user-drag:none;max-width:none;}" +
-
-        /* TOUCH OVERLAY */
-        "#touchOverlay{position:absolute;top:0;left:0;width:100%;height:100%;z-index:5;touch-action:none;}" +
 
         /* CONTROLS BAR */
         ".controls-bar{background:#161B22;border-top:1px solid #1a508b;padding:4px 6px;display:none;flex-wrap:wrap;gap:3px;justify-content:center;flex-shrink:0;}" +
@@ -223,12 +268,6 @@ public class MainActivity extends Activity {
 
         ".setting-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #1a508b33;}" +
         ".setting-label{color:white;font-size:12px;}" +
-        ".toggle{position:relative;width:40px;height:22px;cursor:pointer;}" +
-        ".toggle input{opacity:0;width:0;height:0;}" +
-        ".slider{position:absolute;top:0;left:0;right:0;bottom:0;background:#0f3460;border-radius:11px;transition:.3s;}" +
-        ".slider:before{content:'';position:absolute;width:16px;height:16px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s;}" +
-        ".toggle input:checked+.slider{background:#00D4FF;}" +
-        ".toggle input:checked+.slider:before{transform:translateX(18px);}" +
 
         ".clip-area{width:100%;min-height:80px;background:#0f3460;border:1px solid #1a508b;border-radius:6px;color:white;padding:8px;font-size:12px;}" +
         ".clip-btn{padding:8px;border:none;border-radius:5px;font-size:12px;font-weight:bold;margin:3px;cursor:pointer;}" +
@@ -243,6 +282,9 @@ public class MainActivity extends Activity {
         ".step-num{color:#00D4FF;font-size:18px;font-weight:bold;}" +
         ".step-title{color:white;font-size:12px;font-weight:bold;margin:3px 0;}" +
         ".step-desc{color:#888;font-size:10px;line-height:1.3;}" +
+
+        /* DEBUG LOG */
+        "#debugLog{position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.8);color:#4ADE80;font-size:8px;padding:4px;z-index:9999;display:none;font-family:monospace;max-height:60px;overflow-y:auto;}" +
         "</style></head><body>" +
 
         /* TOPBAR */
@@ -266,7 +308,7 @@ public class MainActivity extends Activity {
         "  <button class='sidebar-item' onclick='showPage(\"historyPage\")'>History</button>" +
         "  <button class='sidebar-item' onclick='showPage(\"tutorialPage\")'>Tutorial</button>" +
         "  <button class='sidebar-item' onclick='showPage(\"aboutPage\")'>About</button>" +
-        "  <div class='sidebar-footer'>v2.6.0 | github.com/jalalmx32/screen-share</div>" +
+        "  <div class='sidebar-footer'>v2.8.0 | github.com/jalalmx32/screen-share</div>" +
         "</div>" +
 
         /* HOME */
@@ -274,14 +316,14 @@ public class MainActivity extends Activity {
         "  <div class='card'>" +
         "    <input type='text' id='ipInput' placeholder='PC IP: 192.168.43.1:8765'>" +
         "    <input type='password' id='passInput' placeholder='Password (optional)'>" +
-        "    <button id='toggleBtn' class='btn-connect' onclick='toggleConnection()'>Connect</button>" +
+        "    <button id='toggleBtn' class='btn-connect' ontouchstart='toggleConnection(event)' onclick='toggleConnection(event)'>Connect</button>" +
         "  </div>" +
         "  <div id='status' class='offline'>Offline</div>" +
         "  <div class='scan-section' id='scanSection'>" +
         "    <div class='scan-title'>Scanning for servers...</div>" +
         "    <div id='scanList'></div>" +
         "    <div class='scan-status' id='scanStatus'></div>" +
-        "    <button class='scan-refresh' onclick='startScan()'>Refresh</button>" +
+        "    <button class='scan-refresh' ontouchstart='startScan(event)' onclick='startScan(event)'>Refresh</button>" +
         "  </div>" +
         "  <div class='card'><div class='info'>" +
         "    <b>1.</b> Enable hotspot on Android<br>" +
@@ -290,12 +332,13 @@ public class MainActivity extends Activity {
         "    <b>4.</b> Enter IP or tap detected server<br>" +
         "    <b>5.</b> Touch to control PC!" +
         "  </div></div>" +
+
         /* AUTHOR FOOTER */
-        "  <div style='text-align:center;padding:12px;margin-top:auto;'>" +
-        "    <div style='color:#888;font-size:10px;'>ScreenShare v2.7.0</div>" +
-        "    <div style='margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;'>" +
-        "      <span style='color:#e0e0e0;font-size:12px;'>by <b style=\"color:#00D4FF\">Jalal</b></span>" +
-        "      <a href='https://t.me/x16_96' style='text-decoration:none;display:flex;align-items:center;gap:3px;'>" +
+        "  <div class='footer'>" +
+        "    <div class='ver'>ScreenShare v2.8.0</div>" +
+        "    <div class='author'>" +
+        "      <span class='name'>by <b>Jalal</b></span>" +
+        "      <a class='tg' href='https://t.me/x16_96'>" +
         "        <svg width='16' height='16' viewBox='0 0 24 24' fill='#00D4FF'><path d='M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm5.95 7.47l-1.97 9.28c-.15.67-.54.83-1.09.52l-3.02-2.22-1.46 1.4c-.16.16-.3.3-.61.3l.22-3.05 5.55-5.01c.24-.22-.05-.33-.37-.14L8.68 13.3l-2.96-.92c-.64-.2-.66-.64.13-.95l11.53-4.45c.53-.19 1 .13.83.95l-.23.09z'/></svg>" +
         "        <span style='color:#00D4FF;font-size:11px;'>@x16_96</span>" +
         "      </a>" +
@@ -307,7 +350,6 @@ public class MainActivity extends Activity {
         "<div id='screenView'>" +
         "  <div id='screenContainer'>" +
         "    <img id='screenImg' draggable='false'>" +
-        "    <canvas id='touchOverlay'></canvas>" +
         "  </div>" +
         "  <div class='controls-bar active' id='ctrlBar'>" +
         "    <div class='ctrl-key special' ontouchstart='sendKey(event,\"win\")'>Win</div>" +
@@ -374,77 +416,31 @@ public class MainActivity extends Activity {
         "  <div class='step'><div class='step-num'>3</div><div class='step-title'>Start Server</div><div class='step-desc'>Run ScreenShare on Windows</div></div>" +
         "  <div class='step'><div class='step-num'>4</div><div class='step-title'>Auto Detect</div><div class='step-desc'>App auto-detects servers</div></div>" +
         "  <div class='step'><div class='step-num'>5</div><div class='step-title'>Touch & Pinch</div><div class='step-desc'>Tap to click, pinch to zoom, drag to pan</div></div>" +
-        "  <div class='step'><div class='step-num'>6</div><div class='step-title'>Keyboard</div><div class='step-desc'>QWERTY + special keys + gamepad</div></div>" +
+        "  <div class='step'><div class='step-num'>6</div><div class='step-title'>Keyboard</div><div class='step-desc'>QWERTY + special keys</div></div>" +
         "</div>" +
         "<div class='page' id='aboutPage'>" +
         "  <div class='page-header'><h3>About</h3><button class='page-back' onclick='goHome()'>Back</button></div>" +
         "  <div class='page-content'>" +
-        "    <h4>ScreenShare v2.6.0</h4><p>Wireless Display + Touch Control</p><p>A free alternative to Spacedesk</p>" +
+        "    <h4>ScreenShare v2.8.0</h4><p>Wireless Display + Touch Control</p><p>A free alternative to Spacedesk</p>" +
         "    <h4>Developer</h4><p>Jalal | @x16_96</p><p>github.com/jalalmx32/screen-share</p>" +
         "  </div>" +
         "</div>" +
 
+        /* DEBUG */
+        "<div id='debugLog'></div>" +
+
         "<script>" +
         "var ws=null,isConnected=false,atHome=true;" +
+        "function dbg(m){var d=document.getElementById('debugLog');d.style.display='block';d.innerHTML=m+'<br>';d.scrollTop=d.scrollHeight;console.log(m);}" +
 
         /* INIT */
-        "(function(){try{var s=JSON.parse(localStorage.getItem('ss')||'{}');if(s.ip)document.getElementById('ipInput').value=s.ip;if(s.pass)document.getElementById('passInput').value=s.pass;}catch(e){}})();" +
+        "try{" +
+        "  var s=JSON.parse(localStorage.getItem('ss')||'{}');" +
+        "  if(s.ip)document.getElementById('ipInput').value=s.ip;" +
+        "  if(s.pass)document.getElementById('passInput').value=s.pass;" +
+        "  dbg('Ready. IP: '+(s.ip||'none'));" +
+        "}catch(e){dbg('Init error: '+e.message);}" +
         "function save(k,v){var s=JSON.parse(localStorage.getItem('ss')||'{}');s[k]=v;localStorage.setItem('ss',JSON.stringify(s));}" +
-
-        /* PINCH ZOOM & PAN */
-        "var zoom=1,panX=0,panY=0,startDist=0,startZoom=1,startX=0,startY=0,startPanX=0,startPanY=0,isPinching=false,isDragging=false;" +
-        "var img=null,container=null;" +
-        "(function(){" +
-        "  img=document.getElementById('screenImg');" +
-        "  container=document.getElementById('screenContainer');" +
-        "  if(!img||!container)return;" +
-        "  var lastTouchDist=0;var lastTouchX=0;var lastTouchY=0;" +
-
-        "  container.addEventListener('touchstart',function(e){" +
-        "    if(e.touches.length===2){" +
-        "      isPinching=true;isDragging=false;" +
-        "      var dx=e.touches[0].clientX-e.touches[1].clientX;" +
-        "      var dy=e.touches[0].clientY-e.touches[1].clientY;" +
-        "      startDist=Math.sqrt(dx*dx+dy*dy);" +
-        "      startZoom=zoom;" +
-        "      e.preventDefault();" +
-        "    }else if(e.touches.length===1){" +
-        "      isDragging=true;isPinching=false;" +
-        "      lastTouchX=e.touches[0].clientX;" +
-        "      lastTouchY=e.touches[0].clientY;" +
-        "    }" +
-        "  },{passive:false});" +
-
-        "  container.addEventListener('touchmove',function(e){" +
-        "    if(isPinching&&e.touches.length===2){" +
-        "      var dx=e.touches[0].clientX-e.touches[1].clientX;" +
-        "      var dy=e.touches[0].clientY-e.touches[1].clientY;" +
-        "      var dist=Math.sqrt(dx*dx+dy*dy);" +
-        "      zoom=Math.max(0.5,Math.min(5,startZoom*(dist/startDist)));" +
-        "      updateTransform();" +
-        "      e.preventDefault();" +
-        "    }else if(isDragging&&e.touches.length===1){" +
-        "      var dx=e.touches[0].clientX-lastTouchX;" +
-        "      var dy=e.touches[0].clientY-lastTouchY;" +
-        "      panX+=dx;panY+=dy;" +
-        "      lastTouchX=e.touches[0].clientX;" +
-        "      lastTouchY=e.touches[0].clientY;" +
-        "      updateTransform();" +
-        "      e.preventDefault();" +
-        "    }" +
-        "  },{passive:false});" +
-
-        "  container.addEventListener('touchend',function(e){" +
-        "    if(e.touches.length<2)isPinching=false;" +
-        "    if(e.touches.length===0){isDragging=false;}" +
-        "  });" +
-        "})();" +
-
-        "function updateTransform(){" +
-        "  if(img)img.style.transform='translate('+panX+'px,'+panY+'px) scale('+zoom+')';" +
-        "}" +
-
-        "function resetView(){zoom=1;panX=0;panY=0;updateTransform();}" +
 
         /* SIDEBAR */
         "function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebarOverlay').classList.add('active');}" +
@@ -460,76 +456,134 @@ public class MainActivity extends Activity {
         "  try{Android.setPage('home');}catch(e){}" +
         "  if(isConnected){if(ws){ws.close();ws=null;}isConnected=false;setBtn('Connect','btn-connect');setStatus('Offline','offline');}" +
         "  atHome=true;" +
-        "}" +
+        "  dbg('Home');}" +
 
-        "function showPage(id){closeSidebar();document.getElementById(id).classList.add('active');try{Android.setPage('page');}catch(e){}atHome=false;}" +
+        "function showPage(id){closeSidebar();document.getElementById(id).classList.add('active');try{Android.setPage('page');}catch(e){}atHome=false;dbg('Page: '+id);}" +
+
+        /* PINCH ZOOM */
+        "var zoom=1,panX=0,panY=0;" +
+        "var img=null,container=null;" +
+        "(function(){" +
+        "  img=document.getElementById('screenImg');" +
+        "  container=document.getElementById('screenContainer');" +
+        "  if(!img||!container)return;" +
+        "  var lastDist=0,lastX=0,lastY=0,pinch=false,drag=false;" +
+        "  container.addEventListener('touchstart',function(e){" +
+        "    if(e.touches.length===2){" +
+        "      pinch=true;drag=false;" +
+        "      var dx=e.touches[0].clientX-e.touches[1].clientX;" +
+        "      var dy=e.touches[0].clientY-e.touches[1].clientY;" +
+        "      lastDist=Math.sqrt(dx*dx+dy*dy);e.preventDefault();" +
+        "    }else if(e.touches.length===1){" +
+        "      drag=true;lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;" +
+        "    }" +
+        "  },{passive:false});" +
+        "  container.addEventListener('touchmove',function(e){" +
+        "    if(pinch&&e.touches.length===2){" +
+        "      var dx=e.touches[0].clientX-e.touches[1].clientX;" +
+        "      var dy=e.touches[0].clientY-e.touches[1].clientY;" +
+        "      var d=Math.sqrt(dx*dx+dy*dy);" +
+        "      zoom=Math.max(0.5,Math.min(5,zoom*(d/lastDist)));lastDist=d;" +
+        "      updateTransform();e.preventDefault();" +
+        "    }else if(drag&&e.touches.length===1&&!pinch){" +
+        "      panX+=e.touches[0].clientX-lastX;panY+=e.touches[0].clientY-lastY;" +
+        "      lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;" +
+        "      updateTransform();e.preventDefault();" +
+        "    }" +
+        "  },{passive:false});" +
+        "  container.addEventListener('touchend',function(e){" +
+        "    if(e.touches.length<2)pinch=false;" +
+        "    if(e.touches.length===0)drag=false;" +
+        "  });" +
+        "})();" +
+        "function updateTransform(){if(img)img.style.transform='translate('+panX+'px,'+panY+'px) scale('+zoom+')';}" +
+        "function resetView(){zoom=1;panX=0;panY=0;updateTransform();}" +
 
         /* SCAN */
-        "function startScan(){" +
+        "function startScan(e){" +
+        "  if(e)e.preventDefault();" +
         "  document.getElementById('scanStatus').textContent='Scanning...';document.getElementById('scanList').innerHTML='';" +
         "  var base='192.168.';var ip=document.getElementById('ipInput').value.trim();" +
         "  if(ip){var p=ip.split('.');if(p.length>=3)base=p[0]+'.'+p[1]+'.';}" +
         "  var hosts=[];for(var i=1;i<=15;i++)hosts.push(base+'1.'+i);hosts.push(base+'43.1');hosts.push(base+'0.1');" +
         "  var found=0,checked=0;" +
+        "  dbg('Scanning '+hosts.length+' hosts...');" +
         "  hosts.forEach(function(h){" +
         "    try{" +
         "      var t=new WebSocket('ws://'+h+':8765');var host=h;" +
-        "      var timer=setTimeout(function(){t.close();checked++;if(checked>=hosts.length)scanDone(found);},1200);" +
-        "      t.onopen=function(){clearTimeout(timer);found++;checked++;scannedHosts.push(host);addScanItem(host);t.close();if(checked>=hosts.length)scanDone(found);};" +
-        "      t.onerror=function(){clearTimeout(timer);checked++;if(checked>=hosts.length)scanDone(found);};" +
+        "      var timer=setTimeout(function(){t.close();checked++;if(checked>=hosts.length){scanDone(found);dbg('Scan done: '+found+' found');}},1200);" +
+        "      t.onopen=function(){clearTimeout(timer);found++;checked++;addScanItem(host);t.close();if(checked>=hosts.length){scanDone(found);dbg('Scan done: '+found+' found');}};" +
+        "      t.onerror=function(){clearTimeout(timer);checked++;if(checked>=hosts.length){scanDone(found);dbg('Scan done: '+found+' found');}};" +
         "    }catch(e){checked++;}" +
         "  });" +
         "}" +
-        "var scannedHosts=[];" +
         "function scanDone(n){document.getElementById('scanStatus').textContent=n>0?'Found '+n+' server(s)':'No servers found';}" +
         "function addScanItem(ip){" +
         "  var el=document.getElementById('scanList');var d=document.createElement('div');d.className='scan-item';" +
         "  d.innerHTML='<div><div class=scan-ip>'+ip+'</div><div class=scan-name>ScreenShare Server</div></div>';" +
         "  var btn=document.createElement('button');btn.className='scan-connect';btn.textContent='Connect';" +
-        "  btn.onclick=function(){document.getElementById('ipInput').value=ip+':8765';toggleConnection();};" +
+        "  btn.ontouchstart=function(e){e.preventDefault();document.getElementById('ipInput').value=ip+':8765';toggleConnection(e);};" +
+        "  btn.onclick=function(e){e.preventDefault();document.getElementById('ipInput').value=ip+':8765';toggleConnection(e);};" +
         "  d.appendChild(btn);el.appendChild(d);" +
         "}" +
 
-        /* CONNECTION */
-        "function toggleConnection(){" +
+        /* CONNECTION - THE KEY FIX */
+        "function toggleConnection(e){" +
+        "  if(e)e.preventDefault();" +
+        "  dbg('toggleConnection called, isConnected='+isConnected);" +
         "  if(isConnected){" +
-        "    if(ws)ws.close();ws=null;isConnected=false;" +
+        "    dbg('Disconnecting...');" +
+        "    if(ws){ws.close();ws=null;}" +
+        "    isConnected=false;atHome=true;" +
         "    document.getElementById('homeView').style.display='flex';" +
         "    document.getElementById('screenView').style.display='none';" +
         "    setBtn('Connect','btn-connect');setStatus('Offline','offline');" +
         "    resetView();try{Android.setPage('home');}catch(e){}" +
         "  }else{" +
         "    var ip=document.getElementById('ipInput').value.trim();" +
-        "    if(!ip){alert('Enter IP');return;}" +
+        "    dbg('IP from input: ['+ip+']');" +
+        "    if(!ip){alert('Please enter the PC IP address');dbg('ERROR: No IP');return;}" +
         "    if(ip.indexOf(':')===-1)ip+=':8765';" +
         "    var pass=document.getElementById('passInput').value;" +
         "    save('ip',ip);save('pass',pass);" +
-        "    setStatus('Connecting...','connecting');setBtn('Connecting...','btn-connecting');" +
+        "    setStatus('Connecting to '+ip+'...','connecting');setBtn('Connecting...','btn-connecting');" +
+        "    dbg('Connecting to ws://'+ip+'...');" +
         "    try{" +
-        "      ws=new WebSocket('ws://'+ip);ws.binaryType='arraybuffer';" +
+        "      ws=new WebSocket('ws://'+ip);" +
+        "      ws.binaryType='arraybuffer';" +
         "      ws.onopen=function(){" +
+        "        dbg('WebSocket CONNECTED!');" +
         "        if(pass)ws.send(JSON.stringify({type:'auth',password:pass}));" +
         "        isConnected=true;atHome=false;" +
-        "        setStatus('Connected','online');setBtn('Disconnect','btn-disconnect');" +
+        "        setStatus('Connected!','online');setBtn('Disconnect','btn-disconnect');" +
         "        document.getElementById('homeView').style.display='none';" +
         "        document.getElementById('screenView').style.display='flex';" +
         "        resetView();" +
         "        try{Android.setPage('screen');}catch(e){}" +
-        "        saveHistory(ip);" +
+        "        saveHistory(ip);dbg('Screen view shown');" +
         "      };" +
         "      ws.onmessage=function(e){" +
         "        if(e.data instanceof ArrayBuffer){" +
         "          var b=new Blob([e.data],{type:'image/jpeg'});" +
         "          var u=URL.createObjectURL(b);" +
         "          if(img.src)URL.revokeObjectURL(img.src);img.src=u;" +
+        "        }else{" +
+        "          dbg('MSG: '+e.data);" +
         "        }" +
         "      };" +
-        "      ws.onclose=function(){goHome();};" +
-        "      ws.onerror=function(){goHome();};" +
-        "    }catch(ex){goHome();}" +
+        "      ws.onclose=function(e){" +
+        "        dbg('WebSocket CLOSED: '+e.code);" +
+        "        goHome();" +
+        "      };" +
+        "      ws.onerror=function(e){" +
+        "        dbg('WebSocket ERROR!');goHome();" +
+        "      };" +
+        "    }catch(ex){" +
+        "      dbg('EXCEPTION: '+ex.message);goHome();" +
+        "    }" +
         "  }" +
         "}" +
-        "function setBtn(t,c){var b=document.getElementById('toggleBtn');b.textContent=t;b.className=c;}" +
+        "function setBtn(t,c){var b=document.getElementById('toggleBtn');b.textContent=t;b.className=c;dbg('Button: '+t);}" +
         "function setStatus(t,c){document.getElementById('status').textContent=t;document.getElementById('status').className=c;}" +
 
         /* TOUCH */
