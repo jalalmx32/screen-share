@@ -518,27 +518,30 @@ public class MainActivity extends Activity {
         /* CONNECTION - THE KEY FIX */
         "function toggleConnection(e){" +
         "  if(e)e.preventDefault();" +
-        "  dbg('toggleConnection called, isConnected='+isConnected);" +
+        "  dbg('toggleConnection called');" +
         "  if(isConnected){" +
         "    dbg('Disconnecting...');" +
-        "    if(ws){ws.close();ws=null;}" +
+        "    if(ws){try{ws.close();}catch(x){}ws=null;}" +
         "    isConnected=false;atHome=true;" +
         "    document.getElementById('homeView').style.display='flex';" +
         "    document.getElementById('screenView').style.display='none';" +
         "    setBtn('Connect','btn-connect');setStatus('Offline','offline');" +
         "    resetView();try{Android.setPage('home');}catch(e){}" +
         "  }else{" +
-        "    var ip=document.getElementById('ipInput').value.trim();" +
-        "    dbg('IP from input: ['+ip+']');" +
-        "    if(!ip){alert('Please enter the PC IP address');dbg('ERROR: No IP');return;}" +
+        "    var ip='';" +
+        "    try{ip=document.getElementById('ipInput').value.trim();}catch(x){dbg('ERR read input: '+x);}" +
+        "    dbg('IP=['+ip+']');" +
+        "    if(!ip){dbg('ERROR: No IP entered');return;}" +
         "    if(ip.indexOf(':')===-1)ip+=':8765';" +
-        "    var pass=document.getElementById('passInput').value;" +
-        "    save('ip',ip);save('pass',pass);" +
-        "    setStatus('Connecting to '+ip+'...','connecting');setBtn('Connecting...','btn-connecting');" +
+        "    var pass='';" +
+        "    try{pass=document.getElementById('passInput').value;}catch(x){}" +
+        "    try{save('ip',ip);save('pass',pass);}catch(x){dbg('Save err: '+x);}" +
+        "    setStatus('Connecting...','connecting');setBtn('Connecting...','btn-connecting');" +
         "    dbg('Connecting to ws://'+ip+'...');" +
         "    try{" +
         "      ws=new WebSocket('ws://'+ip);" +
         "      ws.binaryType='arraybuffer';" +
+        "      dbg('WebSocket created, waiting...');" +
         "      ws.onopen=function(){" +
         "        dbg('WebSocket CONNECTED!');" +
         "        if(pass)ws.send(JSON.stringify({type:'auth',password:pass}));" +
