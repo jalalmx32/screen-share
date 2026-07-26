@@ -290,6 +290,17 @@ public class MainActivity extends Activity {
         "    <b>4.</b> Enter IP or tap detected server<br>" +
         "    <b>5.</b> Touch to control PC!" +
         "  </div></div>" +
+        /* AUTHOR FOOTER */
+        "  <div style='text-align:center;padding:12px;margin-top:auto;'>" +
+        "    <div style='color:#888;font-size:10px;'>ScreenShare v2.7.0</div>" +
+        "    <div style='margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;'>" +
+        "      <span style='color:#e0e0e0;font-size:12px;'>by <b style=\"color:#00D4FF\">Jalal</b></span>" +
+        "      <a href='https://t.me/x16_96' style='text-decoration:none;display:flex;align-items:center;gap:3px;'>" +
+        "        <svg width='16' height='16' viewBox='0 0 24 24' fill='#00D4FF'><path d='M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm5.95 7.47l-1.97 9.28c-.15.67-.54.83-1.09.52l-3.02-2.22-1.46 1.4c-.16.16-.3.3-.61.3l.22-3.05 5.55-5.01c.24-.22-.05-.33-.37-.14L8.68 13.3l-2.96-.92c-.64-.2-.66-.64.13-.95l11.53-4.45c.53-.19 1 .13.83.95l-.23.09z'/></svg>" +
+        "        <span style='color:#00D4FF;font-size:11px;'>@x16_96</span>" +
+        "      </a>" +
+        "    </div>" +
+        "  </div>" +
         "</div>" +
 
         /* SCREEN */
