@@ -1,8 +1,12 @@
 package com.screenshare.app
 
 import android.app.Activity
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -15,6 +19,8 @@ import java.nio.ByteBuffer
 
 class MainActivity : Activity() {
 
+    private val TAG = "ScreenShare"
+    
     private lateinit var ipInput: EditText
     private lateinit var connectBtn: Button
     private lateinit var disconnectBtn: Button
@@ -25,6 +31,7 @@ class MainActivity : Activity() {
     private var webSocket: WebSocketClient? = null
     private var frameCount = 0L
     private var lastFpsTime = System.currentTimeMillis()
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,86 +51,116 @@ class MainActivity : Activity() {
     private fun connect() {
         val address = ipInput.text.toString().trim()
         if (address.isEmpty()) {
-            statusText.text = "⚠️ Enter IP address"
-            statusText.setTextColor(0xFFFFB800.toInt())
+            updateStatus("Enter IP address", 0xFFFFB800.toInt())
             return
         }
 
-        try {
-            val uri = URI("ws://$address")
-            
-            webSocket = object : WebSocketClient(uri) {
-                override fun onOpen(handshake: ServerHandshake?) {
-                    runOnUiThread {
-                        statusText.text = "● Connected"
-                        statusText.setTextColor(0xFF4ADE80.toInt())
-                        connectBtn.visibility = View.GONE
-                        disconnectBtn.visibility = View.VISIBLE
-                        screenView.visibility = View.VISIBLE
-                        ipInput.isEnabled = false
-                    }
-                }
+        // Disconnect existing connection first
+        disconnect()
 
-                override fun onMessage(message: ByteBuffer?) {
-                    message?.let {
-                        val bytes = ByteArray(it.remaining())
-                        it.get(bytes)
-                        
-                        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                        if (bitmap != null) {
-                            frameCount++
-                            val currentTime = System.currentTimeMillis()
-                            if (currentTime - lastFpsTime >= 1000) {
-                                val fps = ((frameCount) * 1000 / (currentTime - lastFpsTime)).toInt()
-                                runOnUiThread {
-                                    fpsText.text = "FPS: $fps"
+        updateStatus("Connecting...", 0xFFFFB800.toInt())
+        connectBtn.isEnabled = false
+
+        // Connect in background thread
+        Thread {
+            try {
+                // Add ws:// if not present
+                val url = if (address.startsWith("ws://")) address else "ws://$address"
+                Log.d(TAG, "Connecting to: $url")
+                
+                val uri = URI(url)
+                
+                webSocket = object : WebSocketClient(uri) {
+                    override fun onOpen(handshake: ServerHandshake?) {
+                        Log.d(TAG, "Connected to server")
+                        runOnUiThread {
+                            updateStatus("Connected", 0xFF4ADE80.toInt())
+                            connectBtn.visibility = View.GONE
+                            disconnectBtn.visibility = View.VISIBLE
+                            screenView.visibility = View.VISIBLE
+                            ipInput.isEnabled = false
+                            connectBtn.isEnabled = true
+                        }
+                    }
+
+                    override fun onMessage(message: ByteBuffer?) {
+                        try {
+                            message?.let {
+                                val bytes = ByteArray(it.remaining())
+                                it.get(bytes)
+                                
+                                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                if (bitmap != null) {
+                                    frameCount++
+                                    val currentTime = System.currentTimeMillis()
+                                    if (currentTime - lastFpsTime >= 1000) {
+                                        val fps = ((frameCount) * 1000 / (currentTime - lastFpsTime)).toInt()
+                                        mainHandler.post {
+                                            fpsText.text = "FPS: $fps"
+                                        }
+                                        frameCount = 0
+                                        lastFpsTime = currentTime
+                                    }
+                                    
+                                    mainHandler.post {
+                                        screenView.setImageBitmap(bitmap)
+                                    }
                                 }
-                                frameCount = 0
-                                lastFpsTime = currentTime
                             }
-                            
-                            runOnUiThread {
-                                screenView.setImageBitmap(bitmap)
-                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error processing frame", e)
+                        }
+                    }
+
+                    override fun onMessage(message: String?) {
+                        Log.d(TAG, "Text message: $message")
+                    }
+
+                    override fun onClose(code: Int, reason: String?, remote: Boolean) {
+                        Log.d(TAG, "Disconnected: $reason")
+                        runOnUiThread {
+                            updateStatus("Disconnected", 0xFFF87171.toInt())
+                            resetUI()
+                        }
+                    }
+
+                    override fun onError(ex: Exception?) {
+                        Log.e(TAG, "WebSocket error", ex)
+                        runOnUiThread {
+                            updateStatus("Error: ${ex?.message}", 0xFFF87171.toInt())
+                            resetUI()
                         }
                     }
                 }
 
-                override fun onMessage(message: String?) {}
+                webSocket?.connectBlocking()
 
-                override fun onClose(code: Int, reason: String?, remote: Boolean) {
-                    runOnUiThread {
-                        statusText.text = "● Disconnected"
-                        statusText.setTextColor(0xFFF87171.toInt())
-                        resetUI()
-                    }
-                }
-
-                override fun onError(ex: Exception?) {
-                    runOnUiThread {
-                        statusText.text = "❌ Error: ${ex?.message}"
-                        statusText.setTextColor(0xFFF87171.toInt())
-                        resetUI()
-                    }
+            } catch (e: Exception) {
+                Log.e(TAG, "Connection failed", e)
+                runOnUiThread {
+                    updateStatus("Error: ${e.message}", 0xFFF87171.toInt())
+                    resetUI()
                 }
             }
-
-            statusText.text = "⏳ Connecting..."
-            statusText.setTextColor(0xFFFFB800.toInt())
-            webSocket?.connect()
-
-        } catch (e: Exception) {
-            statusText.text = "❌ ${e.message}"
-            statusText.setTextColor(0xFFF87171.toInt())
-        }
+        }.start()
     }
 
     private fun disconnect() {
-        webSocket?.close()
-        webSocket = null
-        resetUI()
-        statusText.text = "● Offline"
-        statusText.setTextColor(0xFFF87171.toInt())
+        try {
+            webSocket?.close()
+            webSocket = null
+        } catch (e: Exception) {
+            Log.e(TAG, "Error disconnecting", e)
+        }
+        runOnUiThread {
+            resetUI()
+            updateStatus("Offline", 0xFFF87171.toInt())
+        }
+    }
+
+    private fun updateStatus(text: String, color: Int) {
+        statusText.text = "● $text"
+        statusText.setTextColor(color)
     }
 
     private fun resetUI() {
@@ -131,11 +168,12 @@ class MainActivity : Activity() {
         disconnectBtn.visibility = View.GONE
         screenView.visibility = View.GONE
         ipInput.isEnabled = true
+        connectBtn.isEnabled = true
         fpsText.text = "FPS: 0"
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        webSocket?.close()
+        disconnect()
     }
 }
