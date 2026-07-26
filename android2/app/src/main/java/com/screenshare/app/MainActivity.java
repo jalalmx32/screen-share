@@ -284,7 +284,7 @@ public class MainActivity extends Activity {
 
         // CONNECTION - THE KEY FIX
         + "function toggleConnection(e){if(e)e.preventDefault();dbg('toggle');"
-        + "if(isConnected){if(ws){try{ws.close();}catch(x){}ws=null;}isConnected=false;atHome=true;document.getElementById('homeView').style.display='flex';document.getElementById('screenView').style.display='none';setBtn('Connect','btn-connect');setStatus('Offline','offline');resetView();try{Android.setPage('home');}catch(e){}}"
+        + "if(isConnected){isConnected=false;atHome=true;if(ws){try{ws.close();}catch(x){}ws=null;}document.getElementById('homeView').style.display='flex';document.getElementById('screenView').style.display='none';setBtn('Connect','btn-connect');setStatus('Offline','offline');resetView();try{Android.setPage('home');}catch(e){}}"
         + "else{var ip='';try{ip=document.getElementById('ipInput').value.trim();}catch(x){}dbg('IP=['+ip+']');if(!ip){dbg('No IP');return;}"
         + "if(ip.indexOf(':')===-1)ip+=':8765';var pass='';try{pass=document.getElementById('passInput').value;}catch(x){}"
         + "try{save('ip',ip);save('pass',pass);}catch(x){}"
@@ -295,8 +295,8 @@ public class MainActivity extends Activity {
         // IMAGE HANDLER - USE CANVAS
         + "ws.onmessage=function(e){if(e.data instanceof ArrayBuffer){try{var b=new Blob([e.data],{type:'image/jpeg'});var u=URL.createObjectURL(b);var tmp=new Image();tmp.onload=function(){if(canvasEl&&ctx){canvasEl.width=tmp.width;canvasEl.height=tmp.height;ctx.drawImage(tmp,0,0);dbg('Frame '+tmp.width+'x'+tmp.height);}URL.revokeObjectURL(u);};tmp.onerror=function(){dbg('Img load err');URL.revokeObjectURL(u);};tmp.src=u;}catch(ex){dbg('ERR:'+ex.message);}}else{dbg('TXT:'+e.data.substring(0,60));}};"
 
-        + "ws.onclose=function(e){dbg('Closed:'+e.code);goHome();};"
-        + "ws.onerror=function(){dbg('WS Error');goHome();};"
+        + "ws.onclose=function(e){dbg('Closed:'+e.code);isConnected=false;goHome();};"
+        + "ws.onerror=function(){dbg('WS Error');isConnected=false;goHome();};"
         + "}catch(ex){dbg('Exc:'+ex.message);goHome();}}}"
 
         + "function setBtn(t,c){var b=document.getElementById('toggleBtn');b.textContent=t;b.className=c;}"

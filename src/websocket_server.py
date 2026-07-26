@@ -93,7 +93,11 @@ class WebSocketServer:
         self.running = False
         if self.loop and self.loop.is_running():
             # Schedule server close and loop stop
-            self.loop.call_soon_threadsafe(self._close_server_and_stop)
+            try:
+                self.loop.call_soon_threadsafe(self._close_server_and_stop)
+            except RuntimeError:
+                # Loop already stopping or closed
+                pass
         if self.thread:
             self.thread.join(timeout=5)
         self.clients.clear()
@@ -103,10 +107,9 @@ class WebSocketServer:
         if self.server:
             try:
                 self.server.close()
-                # Schedule wait_closed on the loop
-                self.loop.create_task(self.server.wait_closed())
             except Exception:
                 pass
+        # Stop the loop - don't create tasks after scheduling stop
         self.loop.stop()
 
     def _run_udp_discovery(self):
@@ -325,11 +328,13 @@ class WebSocketServer:
 
     async def _stream_frames(self, websocket, client_id):
         frame_count = 0
+        consecutive_errors = 0
+        max_consecutive_errors = 5
         print(f"[STREAM] Starting frame stream for client {client_id}")
         while self.running and client_id in self.clients:
             try:
                 sc = self.screen_capture
-                if sc is None:
+                if sc is None or not sc.is_running():
                     await asyncio.sleep(0.5)
                     continue
 
@@ -337,20 +342,29 @@ class WebSocketServer:
                 if frame:
                     await websocket.send(frame)
                     frame_count += 1
+                    consecutive_errors = 0  # Reset error counter on success
                     if frame_count % 30 == 0:
                         print(f"[STREAM] Sent {frame_count} frames to {client_id}")
                 else:
                     if frame_count == 0:
                         print("[STREAM] No frames available yet, waiting...")
-                await asyncio.sleep(1.0 / sc.fps)
+                    await asyncio.sleep(0.1)  # Brief wait if no frame yet
+                    continue  # Don't count sleep if no frame
+
+                fps = sc.fps if sc.fps > 0 else 30
+                await asyncio.sleep(1.0 / fps)
             except websockets.exceptions.ConnectionClosed:
                 print(f"[STREAM] Client {client_id} disconnected")
                 break
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                print(f"[STREAM] Error: {e}")
-                break
+                consecutive_errors += 1
+                print(f"[STREAM] Error ({consecutive_errors}/{max_consecutive_errors}): {e}")
+                if consecutive_errors >= max_consecutive_errors:
+                    print(f"[STREAM] Too many consecutive errors, stopping stream to {client_id}")
+                    break
+                await asyncio.sleep(0.5)  # Brief pause before retry
         print(f"[STREAM] Stopped. Sent {frame_count} frames total.")
 
     def get_client_count(self):

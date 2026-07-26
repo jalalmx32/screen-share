@@ -25,6 +25,12 @@ from PyQt6.QtGui import (
 from src.screen_capture import ScreenCapture
 from src.websocket_server import WebSocketServer
 
+# Settings persistence
+SETTINGS_DIR = os.path.join(os.path.expanduser("~"), ".screenshare")
+SETTINGS_FILE = os.path.join(SETTINGS_DIR, "settings.json")
+DEFAULT_PORT = 8765
+MAX_PORT_ATTEMPTS = 5
+
 
 def create_app_icon(size=64):
     """Draw a clean monitor/broadcast icon programmatically (no external asset needed)."""
@@ -361,52 +367,90 @@ class MainWindow(QMainWindow):
         self.ws_server = None
         self.is_running = False
         self.current_ip = "127.0.0.1"
-        
+        self.current_port = DEFAULT_PORT
+
+        # Load persisted settings
+        self.settings = self._load_settings()
+
         # Connect signals
         self.signals.client_connected.connect(self.on_client_connected)
         self.signals.client_disconnected.connect(self.on_client_disconnected)
         self.signals.status_update.connect(self.on_status_update)
         self.signals.fps_update.connect(self.on_fps_update)
         self.signals.error_occurred.connect(self.on_error)
-        
+
         self.init_ui()
         self.init_system_tray()
-        
+
         # Defer IP lookup so it never blocks the initial UI render
         QTimer.singleShot(100, self.update_ip_address)
-        
+
         # Timer for updating connection info
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update_connection_info)
         self.update_timer.start(1000)
-    
+
+    def _load_settings(self):
+        """Load persisted settings from disk"""
+        defaults = {
+            "auto_start": True,
+            "minimize_to_tray": True,
+            "quality": "Medium (720p)",
+            "fps": 30,
+            "port": DEFAULT_PORT,
+        }
+        try:
+            if os.path.exists(SETTINGS_FILE):
+                with open(SETTINGS_FILE, "r") as f:
+                    saved = json.load(f)
+                    defaults.update(saved)
+        except Exception:
+            pass
+        return defaults
+
+    def _save_settings(self):
+        """Persist current settings to disk"""
+        try:
+            os.makedirs(SETTINGS_DIR, exist_ok=True)
+            self.settings = {
+                "auto_start": self.auto_start_cb.isChecked(),
+                "minimize_to_tray": self.minimize_tray_cb.isChecked(),
+                "quality": self.quality_combo.currentText(),
+                "fps": self.fps_spin.value(),
+                "port": self.current_port,
+            }
+            with open(SETTINGS_FILE, "w") as f:
+                json.dump(self.settings, f, indent=2)
+        except Exception as e:
+            print(f"Failed to save settings: {e}")
+
     def init_ui(self):
         self.setWindowTitle("ScreenShare - Wireless Display")
         self.setMinimumSize(380, 480)
         self.resize(420, 550)
-        
+
         # Apply dark theme
         self.setStyleSheet(DarkTheme.STYLESHEET)
-        
+
         # Status bar (used throughout the class via self.status_bar)
         self.status_bar = self.statusBar()
-        
+
         # Central widget
         central = QWidget()
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
         layout.setSpacing(10)
         layout.setContentsMargins(16, 10, 16, 10)
-        
+
         # === Header ===
         header = QVBoxLayout()
         header.setSpacing(4)
-        
+
         title = QLabel("ScreenShare")
         title.setObjectName("title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header.addWidget(title)
-        
+
         subtitle = QLabel("Wireless Display for Android")
         subtitle.setObjectName("subtitle")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -416,55 +460,55 @@ class MainWindow(QMainWindow):
         author.setObjectName("subtitle")
         author.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header.addWidget(author)
-        
+
         layout.addLayout(header)
-        
+
         # === Status Card ===
         status_frame = QFrame()
         status_frame.setObjectName("card")
         status_layout = QVBoxLayout(status_frame)
-        
+
         self.status_label = QLabel("● Offline")
         self.status_label.setObjectName("status offline")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         status_layout.addWidget(self.status_label)
-        
+
         self.clients_label = QLabel("No devices connected")
         self.clients_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.clients_label.setStyleSheet("color: #888888; font-size: 12px;")
         status_layout.addWidget(self.clients_label)
-        
+
         layout.addWidget(status_frame)
-        
+
         # === IP Address Card ===
         ip_frame = QFrame()
         ip_frame.setObjectName("card")
         ip_layout = QVBoxLayout(ip_frame)
-        
+
         ip_title = QLabel("📡 Connection Address")
         ip_title.setStyleSheet("color: #888888; font-size: 12px;")
         ip_layout.addWidget(ip_title)
-        
+
         self.ip_label = QLabel("Loading...")
         self.ip_label.setObjectName("ip-label")
         self.ip_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         ip_layout.addWidget(self.ip_label)
-        
+
         copy_btn = QPushButton("📋 Copy Address")
         copy_btn.clicked.connect(self.copy_ip_address)
         ip_layout.addWidget(copy_btn)
-        
+
         layout.addWidget(ip_frame)
-        
+
         # === Settings Card ===
         settings_frame = QFrame()
         settings_frame.setObjectName("card")
         settings_layout = QVBoxLayout(settings_frame)
-        
+
         settings_title = QLabel("⚙️ Settings")
         settings_title.setStyleSheet("color: #888888; font-size: 12px;")
         settings_layout.addWidget(settings_title)
-        
+
         # Display selection
         display_layout = QHBoxLayout()
         display_label = QLabel("Display:")
@@ -475,81 +519,87 @@ class MainWindow(QMainWindow):
         display_layout.addWidget(display_label)
         display_layout.addWidget(self.display_combo)
         settings_layout.addLayout(display_layout)
-        
+
         # Quality settings
         quality_layout = QHBoxLayout()
         quality_label = QLabel("Quality:")
         quality_label.setFixedWidth(80)
         self.quality_combo = QComboBox()
         self.quality_combo.addItems(["High (1080p)", "Medium (720p)", "Low (480p)"])
+        # Restore saved quality
+        saved_quality = self.settings.get("quality", "Medium (720p)")
+        idx = self.quality_combo.findText(saved_quality)
+        if idx >= 0:
+            self.quality_combo.setCurrentIndex(idx)
         quality_layout.addWidget(quality_label)
         quality_layout.addWidget(self.quality_combo)
         settings_layout.addLayout(quality_layout)
-        
+
         # FPS settings
         fps_layout = QHBoxLayout()
         fps_label = QLabel("FPS:")
         fps_label.setFixedWidth(80)
         self.fps_spin = QSpinBox()
         self.fps_spin.setRange(15, 60)
-        self.fps_spin.setValue(30)
+        self.fps_spin.setValue(self.settings.get("fps", 30))
         fps_layout.addWidget(fps_label)
         fps_layout.addWidget(self.fps_spin)
         settings_layout.addLayout(fps_layout)
-        
+
         # Auto-start checkbox
         self.auto_start_cb = QCheckBox("Auto-start on launch")
+        self.auto_start_cb.setChecked(self.settings.get("auto_start", True))
         settings_layout.addWidget(self.auto_start_cb)
-        
+
         # Minimize to tray checkbox
         self.minimize_tray_cb = QCheckBox("Minimize to system tray")
-        self.minimize_tray_cb.setChecked(True)
+        self.minimize_tray_cb.setChecked(self.settings.get("minimize_to_tray", True))
         settings_layout.addWidget(self.minimize_tray_cb)
-        
+
         layout.addWidget(settings_frame)
-        
+
         # === Start/Stop Button ===
         self.start_btn = QPushButton("▶️  Start Sharing")
         self.start_btn.setObjectName("start-btn")
         self.start_btn.clicked.connect(self.toggle_sharing)
         layout.addWidget(self.start_btn)
-        
+
         # === Footer ===
         footer = QLabel("ScreenShare v1.0 | Android Only")
         footer.setObjectName("subtitle")
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(footer)
-        
+
         layout.addStretch()
-    
+
     def init_system_tray(self):
         """Initialize system tray icon"""
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setIcon(create_app_icon(32))
-        
+
         # Tray menu
         tray_menu = QMenu()
-        
+
         show_action = QAction("Show Window", self)
         show_action.triggered.connect(self.show_window)
         tray_menu.addAction(show_action)
-        
+
         tray_menu.addSeparator()
-        
+
         self.tray_start_action = QAction("Start Sharing", self)
         self.tray_start_action.triggered.connect(self.toggle_sharing)
         tray_menu.addAction(self.tray_start_action)
-        
+
         tray_menu.addSeparator()
-        
+
         quit_action = QAction("Quit", self)
         quit_action.triggered.connect(self.quit_app)
         tray_menu.addAction(quit_action)
-        
+
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.activated.connect(self.tray_icon_clicked)
         self.tray_icon.show()
-    
+
     def get_local_ip(self):
         """Get the local IP address"""
         try:
@@ -562,38 +612,38 @@ class MainWindow(QMainWindow):
             return ip
         except Exception:
             return "127.0.0.1"
-    
+
     def update_ip_address(self):
         """Update displayed IP address"""
         ip = self.get_local_ip()
-        self.ip_label.setText(f"{ip}:8765")
+        self.ip_label.setText(f"{ip}:{self.current_port}")
         self.current_ip = ip
-    
+
     def copy_ip_address(self):
         """Copy IP address to clipboard"""
         clipboard = QApplication.clipboard()
-        clipboard.setText(f"{self.current_ip}:8765")
+        clipboard.setText(f"{self.current_ip}:{self.current_port}")
         self.status_bar.showMessage("Address copied to clipboard!", 2000)
-    
+
     def on_display_changed(self, index):
         """Called when the user selects a different display from the dropdown"""
         selected = self.display_combo.currentText()
         self.status_bar.showMessage(f"Display selected: {selected}", 2000)
-        
+
         # If sharing is already in progress, restart it so the new display takes effect
         if self.is_running and self.screen_capture:
             self.stop_sharing()
             self.start_sharing()
-    
+
     def toggle_sharing(self):
         """Start or stop screen sharing"""
         if self.is_running:
             self.stop_sharing()
         else:
             self.start_sharing()
-    
+
     def start_sharing(self):
-        """Start screen sharing"""
+        """Start screen sharing with port conflict retry"""
         try:
             # Get settings
             quality_map = {
@@ -604,65 +654,92 @@ class MainWindow(QMainWindow):
             quality = self.quality_combo.currentText()
             resolution = quality_map.get(quality, (1280, 720))
             fps = self.fps_spin.value()
-            
-            # Start screen capture
+
+            # Start screen capture first so frames are ready when clients connect
             self.screen_capture = ScreenCapture(
                 resolution=resolution,
                 fps=fps
             )
-            
-            # Start WebSocket server
-            self.ws_server = WebSocketServer(
-                host="0.0.0.0",
-                port=8765,
-                screen_capture=self.screen_capture,
-                signals=self.signals
-            )
-            
-            self.ws_server.start()
-
-            # Wait briefly for server thread to be ready before starting capture
-            time.sleep(0.1)
-
             self.screen_capture.start()
+
+            # Wait for first frame to be captured before starting server
+            # This prevents clients from seeing "no frames available"
+            for _ in range(50):  # Up to 5 seconds
+                if self.screen_capture.get_frame() is not None:
+                    break
+                time.sleep(0.1)
+
+            # Try starting WebSocket server with port conflict retry
+            self.ws_server = None
+            for port_offset in range(MAX_PORT_ATTEMPTS):
+                port = self.current_port + port_offset
+                try:
+                    self.ws_server = WebSocketServer(
+                        host="0.0.0.0",
+                        port=port,
+                        screen_capture=self.screen_capture,
+                        signals=self.signals
+                    )
+                    self.ws_server.start()
+                    self.current_port = port
+                    break
+                except RuntimeError as e:
+                    if port_offset == MAX_PORT_ATTEMPTS - 1:
+                        # Last attempt - propagate the error
+                        raise RuntimeError(
+                            f"All ports {DEFAULT_PORT}-{DEFAULT_PORT + MAX_PORT_ATTEMPTS - 1} "
+                            f"are in use. Stop other instances or try a different port."
+                        ) from e
+                    self.ws_server = None
+                    continue
 
             self.is_running = True
             self.update_ui_state()
+            self.update_ip_address()
+            self._save_settings()
 
-            self.status_bar.showMessage("Screen sharing started!", 3000)
+            port_info = f" on port {self.current_port}" if self.current_port != DEFAULT_PORT else ""
+            self.status_bar.showMessage(f"Screen sharing started{port_info}!", 3000)
 
         except RuntimeError as e:
-            # Port conflict or other startup error
             self.signals.error_occurred.emit(str(e))
         except Exception as e:
-            self.signals.error_occurred.emit(str(e))
-    
+            self.signals.error_occurred.emit(f"Failed to start sharing: {e}")
+        finally:
+            # Clean up screen capture if server failed to start
+            if not self.is_running and self.screen_capture:
+                self.screen_capture.stop()
+                self.screen_capture = None
+
     def auto_start_sharing(self):
-        """Auto-start sharing on launch if the checkbox is checked"""
+        """Auto-start sharing on launch if the setting is enabled"""
         if self.auto_start_cb.isChecked():
             # Wait a moment for GUI to load, then start
             QTimer.singleShot(1000, self.start_sharing)
-    
+
     def stop_sharing(self):
         """Stop screen sharing"""
+        was_running = self.is_running
+        self.is_running = False
         try:
             if self.ws_server:
                 self.ws_server.stop()
                 self.ws_server = None
-            
+
             if self.screen_capture:
                 self.screen_capture.stop()
                 self.screen_capture = None
-            
-            self.is_running = False
-            self.update_ui_state()
-            self.clients_label.setText("No devices connected")
-            
-            self.status_bar.showMessage("Screen sharing stopped", 3000)
-            
+
+            if was_running:
+                self.update_ui_state()
+                self.clients_label.setText("No devices connected")
+                self.status_bar.showMessage("Screen sharing stopped", 3000)
+
+            self._save_settings()
+
         except Exception as e:
-            self.signals.error_occurred.emit(str(e))
-    
+            print(f"Error during stop: {e}")
+
     def update_ui_state(self):
         """Update UI based on sharing state"""
         if self.is_running:
@@ -677,11 +754,11 @@ class MainWindow(QMainWindow):
             self.status_label.setText("● Offline")
             self.status_label.setObjectName("status offline")
             self.tray_start_action.setText("Start Sharing")
-        
+
         # Re-apply styles
         self.start_btn.setStyleSheet(self.start_btn.styleSheet())
         self.status_label.setStyleSheet(self.status_label.styleSheet())
-    
+
     def update_connection_info(self):
         """Periodically update connection info"""
         if self.ws_server:
@@ -692,32 +769,34 @@ class MainWindow(QMainWindow):
             else:
                 self.clients_label.setText("Waiting for device...")
                 self.clients_label.setStyleSheet("color: #fbbf24; font-size: 12px;")
-    
+
     # === Signal Handlers ===
     def on_client_connected(self, client_id):
         self.status_bar.showMessage(f"Device connected: {client_id}", 3000)
-    
+
     def on_client_disconnected(self, client_id):
         self.status_bar.showMessage(f"Device disconnected: {client_id}", 3000)
-    
+
     def on_status_update(self, status):
         self.status_bar.showMessage(status, 3000)
-    
+
     def on_fps_update(self, fps):
         pass  # Could update FPS display
-    
+
     def on_error(self, error):
         QMessageBox.critical(self, "Error", str(error))
-        self.stop_sharing()
-    
+        # Only stop sharing if it's actually running (not during a failed startup)
+        if self.is_running:
+            self.stop_sharing()
+
     def show_window(self):
         self.showNormal()
         self.activateWindow()
-    
+
     def tray_icon_clicked(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             self.show_window()
-    
+
     def closeEvent(self, event):
         if self.minimize_tray_cb.isChecked() and self.is_running:
             event.ignore()
@@ -730,7 +809,7 @@ class MainWindow(QMainWindow):
             )
         else:
             self.quit_app()
-    
+
     def quit_app(self):
         self.stop_sharing()
         self.tray_icon.hide()
@@ -741,16 +820,16 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("ScreenShare")
     app.setOrganizationName("ScreenShare")
-    
+
     # Set app icon
     app.setWindowIcon(create_app_icon(64))
-    
+
     window = MainWindow()
     window.show()
-    
+
     # Auto-start sharing on launch
     window.auto_start_sharing()
-    
+
     sys.exit(app.exec())
 
 
