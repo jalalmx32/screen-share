@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ScreenShare</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="ip_address">IP Address</string>
+    <string name="port">Port</string>
+    <string name="settings">Settings</string>
+    <string name="how_to_connect">How to connect:</string>
+    <string name="step1">Enable hotspot on your Android</string>
+    <string name="step2">Connect PC to the hotspot</string>
+    <string name="step3">Start ScreenShare on PC</string>
+    <string name="step4">Enter the IP shown on PC screen</string>
+</resources>
