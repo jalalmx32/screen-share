@@ -17,10 +17,79 @@ from PyQt6.QtWidgets import (
     QSystemTrayIcon, QMenu, QMessageBox, QSplashScreen
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QSize, QThread
-from PyQt6.QtGui import QIcon, QPixmap, QFont, QColor, QPalette, QAction
+from PyQt6.QtGui import (
+    QIcon, QPixmap, QFont, QColor, QPalette, QAction,
+    QPainter, QLinearGradient, QBrush, QPen
+)
 
 from src.screen_capture import ScreenCapture
 from src.websocket_server import WebSocketServer
+
+
+def create_app_icon(size=64):
+    """Draw a clean monitor/broadcast icon programmatically (no external asset needed)."""
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.GlobalColor.transparent)
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+    # Rounded gradient background
+    gradient = QLinearGradient(0, 0, size, size)
+    gradient.setColorAt(0, QColor("#00d4ff"))
+    gradient.setColorAt(1, QColor("#0f3460"))
+    painter.setBrush(QBrush(gradient))
+    painter.setPen(Qt.PenStyle.NoPen)
+    radius = size * 0.22
+    painter.drawRoundedRect(0, 0, size, size, radius, radius)
+
+    # Monitor body
+    margin = size * 0.20
+    screen_w = size - margin * 2
+    screen_h = screen_w * 0.62
+    screen_x = margin
+    screen_y = margin * 0.85
+
+    painter.setBrush(QBrush(QColor("#1a1a2e")))
+    painter.setPen(QPen(QColor("#ffffff"), max(1.0, size * 0.02)))
+    painter.drawRoundedRect(
+        int(screen_x), int(screen_y), int(screen_w), int(screen_h),
+        size * 0.06, size * 0.06
+    )
+
+    # Signal / broadcast wave inside the screen
+    painter.setPen(QPen(QColor("#00d4ff"), max(1.5, size * 0.04), Qt.PenStyle.SolidLine,
+                         Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+    wave_y = screen_y + screen_h * 0.6
+    p1 = (screen_x + screen_w * 0.15, wave_y)
+    p2 = (screen_x + screen_w * 0.40, wave_y - screen_h * 0.30)
+    p3 = (screen_x + screen_w * 0.62, wave_y + screen_h * 0.12)
+    p4 = (screen_x + screen_w * 0.85, wave_y - screen_h * 0.35)
+    painter.drawLine(int(p1[0]), int(p1[1]), int(p2[0]), int(p2[1]))
+    painter.drawLine(int(p2[0]), int(p2[1]), int(p3[0]), int(p3[1]))
+    painter.drawLine(int(p3[0]), int(p3[1]), int(p4[0]), int(p4[1]))
+
+    # Monitor stand
+    stand_w = screen_w * 0.26
+    stand_h = size * 0.09
+    stand_x = size / 2 - stand_w / 2
+    stand_y = screen_y + screen_h
+
+    painter.setBrush(QBrush(QColor("#ffffff")))
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.drawRect(int(stand_x), int(stand_y), int(stand_w), int(stand_h * 0.5))
+
+    base_w = screen_w * 0.55
+    base_h = size * 0.055
+    base_x = size / 2 - base_w / 2
+    base_y = stand_y + stand_h * 0.5
+    painter.drawRoundedRect(
+        int(base_x), int(base_y), int(base_w), int(base_h),
+        base_h * 0.4, base_h * 0.4
+    )
+
+    painter.end()
+    return QIcon(pixmap)
 
 
 class SignalEmitter(QObject):
@@ -283,6 +352,7 @@ class MainWindow(QMainWindow):
         self.screen_capture = None
         self.ws_server = None
         self.is_running = False
+        self.current_ip = "127.0.0.1"
         
         # Connect signals
         self.signals.client_connected.connect(self.on_client_connected)
@@ -293,7 +363,9 @@ class MainWindow(QMainWindow):
         
         self.init_ui()
         self.init_system_tray()
-        self.update_ip_address()
+        
+        # Defer IP lookup so it never blocks the initial UI render
+        QTimer.singleShot(100, self.update_ip_address)
         
         # Timer for updating connection info
         self.update_timer = QTimer()
@@ -307,6 +379,9 @@ class MainWindow(QMainWindow):
         
         # Apply dark theme
         self.setStyleSheet(DarkTheme.STYLESHEET)
+        
+        # Status bar (used throughout the class via self.status_bar)
+        self.status_bar = self.statusBar()
         
         # Central widget
         central = QWidget()
@@ -421,7 +496,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(settings_frame)
         
         # === Start/Stop Button ===
-        self.start_btn = QPushButton("▶  Start Sharing")
+        self.start_btn = QPushButton("▶️  Start Sharing")
         self.start_btn.setObjectName("start-btn")
         self.start_btn.clicked.connect(self.toggle_sharing)
         layout.addWidget(self.start_btn)
@@ -437,11 +512,7 @@ class MainWindow(QMainWindow):
     def init_system_tray(self):
         """Initialize system tray icon"""
         self.tray_icon = QSystemTrayIcon(self)
-        
-        # Create a simple icon
-        pixmap = QPixmap(32, 32)
-        pixmap.fill(QColor("#00d4ff"))
-        self.tray_icon.setIcon(QIcon(pixmap))
+        self.tray_icon.setIcon(create_app_icon(32))
         
         # Tray menu
         tray_menu = QMenu()
@@ -471,6 +542,7 @@ class MainWindow(QMainWindow):
         try:
             # Connect to a remote server to find local IP
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(1)
             s.connect(("8.8.8.8", 80))
             ip = s.getsockname()[0]
             s.close()
@@ -489,6 +561,16 @@ class MainWindow(QMainWindow):
         clipboard = QApplication.clipboard()
         clipboard.setText(f"{self.current_ip}:8765")
         self.status_bar.showMessage("Address copied to clipboard!", 2000)
+    
+    def on_display_changed(self, index):
+        """Called when the user selects a different display from the dropdown"""
+        selected = self.display_combo.currentText()
+        self.status_bar.showMessage(f"Display selected: {selected}", 2000)
+        
+        # If sharing is already in progress, restart it so the new display takes effect
+        if self.is_running and self.screen_capture:
+            self.stop_sharing()
+            self.start_sharing()
     
     def toggle_sharing(self):
         """Start or stop screen sharing"""
@@ -558,13 +640,13 @@ class MainWindow(QMainWindow):
     def update_ui_state(self):
         """Update UI based on sharing state"""
         if self.is_running:
-            self.start_btn.setText("⏹  Stop Sharing")
+            self.start_btn.setText("⏹️  Stop Sharing")
             self.start_btn.setObjectName("stop-btn")
             self.status_label.setText("● Online")
             self.status_label.setObjectName("status")
             self.tray_start_action.setText("Stop Sharing")
         else:
-            self.start_btn.setText("▶  Start Sharing")
+            self.start_btn.setText("▶️  Start Sharing")
             self.start_btn.setObjectName("start-btn")
             self.status_label.setText("● Offline")
             self.status_label.setObjectName("status offline")
@@ -635,9 +717,7 @@ def main():
     app.setOrganizationName("ScreenShare")
     
     # Set app icon
-    pixmap = QPixmap(64, 64)
-    pixmap.fill(QColor("#00d4ff"))
-    app.setWindowIcon(QIcon(pixmap))
+    app.setWindowIcon(create_app_icon(64))
     
     window = MainWindow()
     window.show()
