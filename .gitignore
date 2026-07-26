@@ -33,3 +33,6 @@ android/.idea/
 # Temporary
 *.tmp
 *.log
+android-release.jks
+android2/*.apk
+android2/*.idsig
