@@ -143,8 +143,8 @@ public class MainActivity extends Activity {
         + ".footer{text-align:center;padding:12px;margin-top:auto;}.footer .ver{color:#888;font-size:10px;}"
         + ".footer .auth{margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;}"
         + ".footer .nm{color:#e0e0e0;font-size:12px;}.footer .nm b{color:#00D4FF;}"
-        + "#screenView{display:none;flex:1;flex-direction:column;overflow:hidden;background:#000;}"
-        + "#screenContainer{flex:1;overflow:hidden;position:relative;touch-action:none;}"
+        + "#screenView{display:none;flex-direction:column;overflow:hidden;position:fixed;top:40px;left:0;right:0;bottom:0;background:#000;z-index:100;}"
+        + "#screenContainer{flex:1;overflow:hidden;position:relative;touch-action:none;min-height:0;}"
         + "#screenCanvas{width:100%;height:100%;display:block;background:#000;touch-action:none;}"
         + ".controls-bar{background:#161B22;border-top:1px solid #1a508b;padding:4px 6px;display:flex;flex-wrap:wrap;gap:3px;justify-content:center;flex-shrink:0;}"
         + ".ctrl-key{background:#0f3460;border:1px solid #1a508b;border-radius:3px;color:white;padding:5px 6px;font-size:9px;text-align:center;min-width:30px;}"
@@ -261,7 +261,7 @@ public class MainActivity extends Activity {
         + "function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebarOverlay').classList.remove('active');}"
 
         // GO HOME
-        + "function goHome(){closeSidebar();document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});document.getElementById('homeView').style.display='flex';document.getElementById('screenView').style.display='none';try{Android.setPage('home');}catch(e){}if(isConnected){if(ws){try{ws.close();}catch(x){}ws=null;}isConnected=false;setBtn('Connect','btn-connect');setStatus('Offline','offline');}atHome=true;}"
+        + "function goHome(){closeSidebar();document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});document.getElementById('homeView').style.display='flex';document.getElementById('screenView').style.display='none';try{Android.setPage('home');}catch(e){}if(isConnected){isConnected=false;if(ws){try{ws.close();}catch(x){}ws=null;}setBtn('Connect','btn-connect');setStatus('Offline','offline');}atHome=true;}"
         + "function showPage(id){closeSidebar();document.getElementById(id).classList.add('active');try{Android.setPage('page');}catch(e){}atHome=false;}"
 
         // PINCH ZOOM
