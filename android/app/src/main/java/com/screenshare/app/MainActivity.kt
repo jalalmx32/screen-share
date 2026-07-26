@@ -1,7 +1,6 @@
 package com.screenshare.app
 
 import android.app.Activity
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.os.Handler
@@ -32,54 +31,64 @@ class MainActivity : Activity() {
     private var frameCount = 0L
     private var lastFpsTime = System.currentTimeMillis()
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var isConnecting = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        try {
+            super.onCreate(savedInstanceState)
+            setContentView(R.layout.activity_main)
 
-        ipInput = findViewById(R.id.ipInput)
-        connectBtn = findViewById(R.id.connectBtn)
-        disconnectBtn = findViewById(R.id.disconnectBtn)
-        statusText = findViewById(R.id.statusText)
-        fpsText = findViewById(R.id.fpsText)
-        screenView = findViewById(R.id.screenView)
+            ipInput = findViewById(R.id.ipInput)
+            connectBtn = findViewById(R.id.connectBtn)
+            disconnectBtn = findViewById(R.id.disconnectBtn)
+            statusText = findViewById(R.id.statusText)
+            fpsText = findViewById(R.id.fpsText)
+            screenView = findViewById(R.id.screenView)
 
-        connectBtn.setOnClickListener { connect() }
-        disconnectBtn.setOnClickListener { disconnect() }
+            connectBtn.setOnClickListener { 
+                if (!isConnecting) connect() 
+            }
+            disconnectBtn.setOnClickListener { disconnect() }
+            
+            Log.d(TAG, "App started")
+        } catch (e: Exception) {
+            Log.e(TAG, "onCreate error", e)
+        }
     }
 
     private fun connect() {
         val address = ipInput.text.toString().trim()
         if (address.isEmpty()) {
-            updateStatus("Enter IP address", 0xFFFFB800.toInt())
+            showStatus("Enter IP address", 0xFFFFB800.toInt())
             return
         }
 
-        // Disconnect existing connection first
         disconnect()
-
-        updateStatus("Connecting...", 0xFFFFB800.toInt())
+        isConnecting = true
+        showStatus("Connecting...", 0xFFFFB800.toInt())
         connectBtn.isEnabled = false
 
-        // Connect in background thread
         Thread {
             try {
-                // Add ws:// if not present
-                val url = if (address.startsWith("ws://")) address else "ws://$address"
-                Log.d(TAG, "Connecting to: $url")
+                val url = if (address.startsWith("ws://") || address.startsWith("wss://")) {
+                    address
+                } else {
+                    "ws://$address"
+                }
                 
+                Log.d(TAG, "Connecting to: $url")
                 val uri = URI(url)
                 
                 webSocket = object : WebSocketClient(uri) {
                     override fun onOpen(handshake: ServerHandshake?) {
-                        Log.d(TAG, "Connected to server")
-                        runOnUiThread {
-                            updateStatus("Connected", 0xFF4ADE80.toInt())
+                        Log.d(TAG, "Connected")
+                        mainHandler.post {
+                            showStatus("Connected", 0xFF4ADE80.toInt())
                             connectBtn.visibility = View.GONE
                             disconnectBtn.visibility = View.VISIBLE
                             screenView.visibility = View.VISIBLE
                             ipInput.isEnabled = false
-                            connectBtn.isEnabled = true
+                            isConnecting = false
                         }
                     }
 
@@ -96,38 +105,38 @@ class MainActivity : Activity() {
                                     if (currentTime - lastFpsTime >= 1000) {
                                         val fps = ((frameCount) * 1000 / (currentTime - lastFpsTime)).toInt()
                                         mainHandler.post {
-                                            fpsText.text = "FPS: $fps"
+                                            try { fpsText.text = "FPS: $fps" } catch (e: Exception) {}
                                         }
                                         frameCount = 0
                                         lastFpsTime = currentTime
                                     }
                                     
                                     mainHandler.post {
-                                        screenView.setImageBitmap(bitmap)
+                                        try { screenView.setImageBitmap(bitmap) } catch (e: Exception) {}
                                     }
                                 }
                             }
                         } catch (e: Exception) {
-                            Log.e(TAG, "Error processing frame", e)
+                            Log.e(TAG, "Frame error", e)
                         }
                     }
 
                     override fun onMessage(message: String?) {
-                        Log.d(TAG, "Text message: $message")
+                        Log.d(TAG, "Text: $message")
                     }
 
                     override fun onClose(code: Int, reason: String?, remote: Boolean) {
-                        Log.d(TAG, "Disconnected: $reason")
-                        runOnUiThread {
-                            updateStatus("Disconnected", 0xFFF87171.toInt())
+                        Log.d(TAG, "Disconnected: $code")
+                        mainHandler.post {
+                            showStatus("Disconnected", 0xFFF87171.toInt())
                             resetUI()
                         }
                     }
 
                     override fun onError(ex: Exception?) {
-                        Log.e(TAG, "WebSocket error", ex)
-                        runOnUiThread {
-                            updateStatus("Error: ${ex?.message}", 0xFFF87171.toInt())
+                        Log.e(TAG, "Error: ${ex?.message}", ex)
+                        mainHandler.post {
+                            showStatus("Error: ${ex?.localizedMessage}", 0xFFF87171.toInt())
                             resetUI()
                         }
                     }
@@ -137,8 +146,8 @@ class MainActivity : Activity() {
 
             } catch (e: Exception) {
                 Log.e(TAG, "Connection failed", e)
-                runOnUiThread {
-                    updateStatus("Error: ${e.message}", 0xFFF87171.toInt())
+                mainHandler.post {
+                    showStatus("Failed: ${e.localizedMessage}", 0xFFF87171.toInt())
                     resetUI()
                 }
             }
@@ -146,34 +155,35 @@ class MainActivity : Activity() {
     }
 
     private fun disconnect() {
-        try {
-            webSocket?.close()
-            webSocket = null
-        } catch (e: Exception) {
-            Log.e(TAG, "Error disconnecting", e)
-        }
-        runOnUiThread {
+        try { webSocket?.close() } catch (e: Exception) {}
+        webSocket = null
+        mainHandler.post {
             resetUI()
-            updateStatus("Offline", 0xFFF87171.toInt())
+            showStatus("Offline", 0xFFF87171.toInt())
         }
     }
 
-    private fun updateStatus(text: String, color: Int) {
-        statusText.text = "● $text"
-        statusText.setTextColor(color)
+    private fun showStatus(text: String, color: Int) {
+        try {
+            statusText.text = "● $text"
+            statusText.setTextColor(color)
+        } catch (e: Exception) {}
     }
 
     private fun resetUI() {
-        connectBtn.visibility = View.VISIBLE
-        disconnectBtn.visibility = View.GONE
-        screenView.visibility = View.GONE
-        ipInput.isEnabled = true
-        connectBtn.isEnabled = true
-        fpsText.text = "FPS: 0"
+        try {
+            connectBtn.visibility = View.VISIBLE
+            connectBtn.isEnabled = true
+            disconnectBtn.visibility = View.GONE
+            screenView.visibility = View.GONE
+            ipInput.isEnabled = true
+            fpsText.text = "FPS: 0"
+            isConnecting = false
+        } catch (e: Exception) {}
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        disconnect()
+        try { webSocket?.close(); webSocket = null } catch (e: Exception) {}
     }
 }
