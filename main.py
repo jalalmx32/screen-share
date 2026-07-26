@@ -630,6 +630,11 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.signals.error_occurred.emit(str(e))
     
+    def auto_start_sharing(self):
+        """Auto-start sharing on launch"""
+        # Wait a moment for GUI to load, then start
+        QTimer.singleShot(1000, self.start_sharing)
+    
     def stop_sharing(self):
         """Stop screen sharing"""
         try:
@@ -735,9 +740,8 @@ def main():
     window = MainWindow()
     window.show()
     
-    # Auto-start if enabled
-    if window.auto_start_cb.isChecked():
-        window.start_sharing()
+    # Auto-start sharing on launch
+    window.auto_start_sharing()
     
     sys.exit(app.exec())
 
