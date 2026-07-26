@@ -113,6 +113,7 @@ class DarkTheme:
         background-color: #1a1a2e;
         color: #e0e0e0;
         font-family: 'Segoe UI', Arial, sans-serif;
+        font-size: 13px;
     }
     
     /* Labels */
@@ -122,22 +123,22 @@ class DarkTheme:
     }
     
     QLabel#title {
-        font-size: 24px;
+        font-size: 20px;
         font-weight: bold;
         color: #00d4ff;
     }
     
     QLabel#subtitle {
-        font-size: 12px;
+        font-size: 11px;
         color: #888888;
     }
     
     QLabel#status {
-        font-size: 14px;
+        font-size: 13px;
         color: #4ade80;
-        padding: 8px 16px;
+        padding: 6px 12px;
         background-color: #16213e;
-        border-radius: 8px;
+        border-radius: 6px;
     }
     
     QLabel#status.offline {
@@ -145,11 +146,11 @@ class DarkTheme:
     }
     
     QLabel#ip-label {
-        font-size: 16px;
+        font-size: 14px;
         color: #00d4ff;
-        padding: 12px 20px;
+        padding: 10px 16px;
         background-color: #16213e;
-        border-radius: 8px;
+        border-radius: 6px;
         font-family: 'Consolas', monospace;
     }
     
@@ -158,9 +159,9 @@ class DarkTheme:
         background-color: #0f3460;
         color: white;
         border: none;
-        padding: 12px 24px;
-        border-radius: 8px;
-        font-size: 14px;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 13px;
         font-weight: bold;
     }
     
@@ -175,8 +176,8 @@ class DarkTheme:
     QPushButton#start-btn {
         background-color: #00d4ff;
         color: #1a1a2e;
-        font-size: 16px;
-        padding: 16px 32px;
+        font-size: 14px;
+        padding: 12px 24px;
     }
     
     QPushButton#start-btn:hover {
@@ -195,8 +196,8 @@ class DarkTheme:
     /* Frame */
     QFrame {
         background-color: #16213e;
-        border-radius: 12px;
-        padding: 16px;
+        border-radius: 8px;
+        padding: 10px;
     }
     
     QFrame#card {
@@ -209,9 +210,10 @@ class DarkTheme:
         background-color: #0f3460;
         color: white;
         border: 1px solid #1a508b;
-        padding: 8px 12px;
-        border-radius: 6px;
-        min-width: 150px;
+        padding: 6px 10px;
+        border-radius: 5px;
+        min-width: 120px;
+        font-size: 12px;
     }
     
     QComboBox:hover {
@@ -220,7 +222,7 @@ class DarkTheme:
     
     QComboBox::drop-down {
         border: none;
-        width: 30px;
+        width: 24px;
     }
     
     QComboBox QAbstractItemView {
@@ -235,8 +237,9 @@ class DarkTheme:
         background-color: #0f3460;
         color: white;
         border: 1px solid #1a508b;
-        padding: 8px;
-        border-radius: 6px;
+        padding: 6px;
+        border-radius: 5px;
+        font-size: 12px;
     }
     
     QSpinBox:hover {
@@ -245,14 +248,15 @@ class DarkTheme:
     
     /* CheckBox */
     QCheckBox {
-        spacing: 8px;
+        spacing: 6px;
         color: #e0e0e0;
+        font-size: 12px;
     }
     
     QCheckBox::indicator {
-        width: 18px;
-        height: 18px;
-        border-radius: 4px;
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
         border: 2px solid #1a508b;
         background-color: #0f3460;
     }
@@ -271,11 +275,12 @@ class DarkTheme:
         background-color: #16213e;
         color: #e0e0e0;
         border-bottom: 1px solid #1a508b;
-        padding: 4px;
+        padding: 2px;
+        font-size: 12px;
     }
     
     QMenuBar::item {
-        padding: 8px 16px;
+        padding: 6px 12px;
         border-radius: 4px;
     }
     
@@ -287,13 +292,14 @@ class DarkTheme:
         background-color: #16213e;
         color: #e0e0e0;
         border: 1px solid #1a508b;
-        border-radius: 8px;
-        padding: 8px;
+        border-radius: 6px;
+        padding: 6px;
     }
     
     QMenu::item {
-        padding: 10px 32px;
+        padding: 8px 24px;
         border-radius: 4px;
+        font-size: 12px;
     }
     
     QMenu::item:selected {
@@ -311,19 +317,20 @@ class DarkTheme:
         background-color: #16213e;
         color: #888888;
         border-top: 1px solid #1a508b;
+        font-size: 11px;
     }
     
     /* ScrollBar */
     QScrollBar:vertical {
         background-color: #1a1a2e;
-        width: 10px;
-        border-radius: 5px;
+        width: 8px;
+        border-radius: 4px;
     }
     
     QScrollBar::handle:vertical {
         background-color: #1a508b;
-        border-radius: 5px;
-        min-height: 30px;
+        border-radius: 4px;
+        min-height: 25px;
     }
     
     QScrollBar::handle:vertical:hover {
@@ -340,7 +347,8 @@ class DarkTheme:
         color: white;
         border: 1px solid #00d4ff;
         border-radius: 4px;
-        padding: 8px;
+        padding: 6px;
+        font-size: 11px;
     }
     """
 
@@ -374,8 +382,8 @@ class MainWindow(QMainWindow):
     
     def init_ui(self):
         self.setWindowTitle("ScreenShare - Wireless Display")
-        self.setMinimumSize(500, 600)
-        self.setFixedSize(500, 600)
+        self.setMinimumSize(380, 480)
+        self.resize(420, 550)
         
         # Apply dark theme
         self.setStyleSheet(DarkTheme.STYLESHEET)
@@ -387,8 +395,8 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
-        layout.setSpacing(16)
-        layout.setContentsMargins(24, 16, 24, 16)
+        layout.setSpacing(10)
+        layout.setContentsMargins(16, 10, 16, 10)
         
         # === Header ===
         header = QVBoxLayout()
