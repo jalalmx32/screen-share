@@ -29,6 +29,16 @@ public class MainActivity extends Activity {
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         );
         
+        // Hide status bar + navigation bar for true fullscreen
+        getWindow().getDecorView().setSystemUiVisibility(
+            android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            | android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            | android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+            | android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        );
+        
         mainHandler = new Handler(Looper.getMainLooper());
         webView = new WebView(this);
         setContentView(webView);
@@ -105,6 +115,29 @@ public class MainActivity extends Activity {
     // Called from JavaScript when navigating
     public void setPage(String page) {
         atHome = "home".equals(page);
+        // Re-apply fullscreen after any navigation
+        reapplyFullscreen();
+    }
+    
+    private void reapplyFullscreen() {
+        runOnUiThread(() -> {
+            getWindow().getDecorView().setSystemUiVisibility(
+                android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+                | android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            );
+        });
+    }
+    
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            reapplyFullscreen();
+        }
     }
     
     private String getHTML() {
