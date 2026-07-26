@@ -1,6 +1,6 @@
 """
 WebSocket Server Module
-Handles client connections and streams screen frames
+Handles client connections, streams screen frames, and receives touch input
 """
 
 import asyncio
@@ -8,6 +8,7 @@ import threading
 import time
 import json
 import uuid
+import pyautogui
 
 try:
     import websockets
@@ -29,11 +30,25 @@ class WebSocketServer:
         self.server = None
         self.thread = None
         self.loop = None
+        
+        # Screen dimensions for touch mapping
+        self.screen_width = 1920
+        self.screen_height = 1080
+        
+        # Configure pyautogui
+        pyautogui.FAILSAFE = True
+        pyautogui.PAUSE = 0.01
     
     def start(self):
         """Start the WebSocket server"""
         if not HAS_WEBSOCKETS:
             raise RuntimeError("websockets library not installed. Run: pip install websockets")
+        
+        # Get actual screen size
+        try:
+            self.screen_width, self.screen_height = pyautogui.size()
+        except Exception:
+            pass
         
         self.running = True
         self.thread = threading.Thread(target=self._run_server, daemon=True)
@@ -89,17 +104,18 @@ class WebSocketServer:
             self.signals.client_connected.emit(f"{client_addr[0]}:{client_addr[1]}")
         
         try:
-            # Send welcome message
+            # Send welcome message with screen dimensions
             welcome = {
                 "type": "welcome",
                 "client_id": client_id,
                 "resolution": self.screen_capture.resolution if self.screen_capture else (1280, 720),
-                "fps": self.screen_capture.fps if self.screen_capture else 30
+                "fps": self.screen_capture.fps if self.screen_capture else 30,
+                "screen_size": [self.screen_width, self.screen_height]
             }
             await websocket.send(json.dumps(welcome))
             
-            # Stream frames to client
-            await self._stream_frames(websocket, client_id)
+            # Handle messages from client (touch events)
+            await self._handle_messages(websocket, client_id)
             
         except websockets.exceptions.ConnectionClosed:
             pass
@@ -113,6 +129,60 @@ class WebSocketServer:
             if self.signals:
                 addr = client_addr if client_addr else ("unknown", 0)
                 self.signals.client_disconnected.emit(f"{addr[0]}:{addr[1]}")
+    
+    async def _handle_messages(self, websocket, client_id):
+        """Handle incoming messages from client (touch events)"""
+        # Start streaming frames
+        frame_task = asyncio.create_task(self._stream_frames(websocket, client_id))
+        
+        try:
+            async for message in websocket:
+                # Handle touch events
+                if isinstance(message, str):
+                    try:
+                        data = json.loads(message)
+                        self._process_touch_event(data)
+                    except json.JSONDecodeError:
+                        pass
+        except websockets.exceptions.ConnectionClosed:
+            pass
+        finally:
+            frame_task.cancel()
+    
+    def _process_touch_event(self, data):
+        """Process touch event from Android client"""
+        try:
+            event_type = data.get("type", "")
+            x = data.get("x", 0)
+            y = data.get("y", 0)
+            
+            # Convert normalized coordinates (0-1) to screen coordinates
+            screen_x = int(x * self.screen_width)
+            screen_y = int(y * self.screen_height)
+            
+            if event_type == "touch_start":
+                # Move mouse and click
+                pyautogui.moveTo(screen_x, screen_y, duration=0.05)
+                pyautogui.mouseDown()
+                
+            elif event_type == "touch_move":
+                # Move mouse
+                pyautogui.moveTo(screen_x, screen_y, duration=0.02)
+                
+            elif event_type == "touch_end":
+                # Release click
+                pyautogui.mouseUp()
+                
+            elif event_type == "double_tap":
+                # Double click
+                pyautogui.doubleClick(screen_x, screen_y)
+                
+            elif event_type == "long_press":
+                # Right click
+                pyautogui.rightClick(screen_x, screen_y)
+                
+        except Exception as e:
+            print(f"Touch error: {e}")
     
     async def _stream_frames(self, websocket, client_id):
         """Stream screen frames to client"""

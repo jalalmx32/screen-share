@@ -411,6 +411,11 @@ class MainWindow(QMainWindow):
         subtitle.setObjectName("subtitle")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header.addWidget(subtitle)
+
+        author = QLabel("by Jalal | @x16_96")
+        author.setObjectName("subtitle")
+        author.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header.addWidget(author)
         
         layout.addLayout(header)
         
