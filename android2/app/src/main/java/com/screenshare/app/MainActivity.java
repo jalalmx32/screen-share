@@ -54,19 +54,9 @@ public class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         
         // Enable console logging
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onConsoleMessage(android.webkit.ConsoleMessage msg) {
-                Log.d(TAG, "JS: " + msg.message());
-            }
-        });
+        webView.setWebChromeClient(new WebChromeClient());
         
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                Log.e(TAG, "WebView error: " + description);
-            }
-        });
+        webView.setWebViewClient(new WebViewClient());
         
         webView.setBackgroundColor(0xFF0D1117);
         
@@ -135,9 +125,7 @@ public class MainActivity extends Activity {
                     final float finalNy = ny;
                     mainHandler.post(() -> {
                         try {
-                            webView.evaluateJavascript(js, value -> {
-                                Log.d(TAG, "Touch sent: " + type + " at " + finalNx + "," + finalNy);
-                            });
+                            webView.evaluateJavascript(js, null);
                         } catch (Exception e) {
                             Log.e(TAG, "Touch error: " + e.getMessage());
                         }
