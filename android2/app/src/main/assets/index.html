@@ -1,0 +1,2169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ScreenShare</title>
+    <meta name="theme-color" content="#0D1117">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        /* ========================================
+           CSS RESET & BASE
+           ======================================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        html, body {
+            background: #0D1117;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            height: 100%;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        /* ========================================
+           CSS VARIABLES (Design Tokens)
+           ======================================== */
+        :root {
+            --color-bg-primary: #0D1117;
+            --color-bg-secondary: #161B22;
+            --color-bg-tertiary: #0F3460;
+            --color-accent: #00D4FF;
+            --color-accent-dark: #00a8cc;
+            --color-text-primary: #E0E0E0;
+            --color-text-secondary: #888888;
+            --color-border: #1A508B;
+            --color-success: #4ADE80;
+            --color-danger: #F87171;
+            --color-warning: #FBBF24;
+            --color-overlay: rgba(0, 0, 0, 0.5);
+            --radius-sm: 3px;
+            --radius-md: 6px;
+            --radius-lg: 8px;
+            --radius-xl: 12px;
+            --transition-fast: 0.15s ease;
+            --transition-normal: 0.25s ease;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+        }
+
+        /* ========================================
+           TOP BAR
+           ======================================== */
+        .topbar {
+            display: flex;
+            align-items: center;
+            padding: 6px 10px;
+            background: var(--color-bg-secondary);
+            border-bottom: 1px solid var(--color-border);
+            height: 48px;
+            flex-shrink: 0;
+            z-index: 100;
+            position: relative;
+        }
+
+        .hamburger {
+            background: none;
+            border: none;
+            color: var(--color-accent);
+            font-size: 22px;
+            padding: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-md);
+            transition: background var(--transition-fast);
+        }
+
+        .hamburger:active {
+            background: var(--color-bg-tertiary);
+        }
+
+        .topbar-title {
+            flex: 1;
+            text-align: center;
+        }
+
+        .topbar-title h1 {
+            color: var(--color-accent);
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .topbar-title .sub {
+            color: var(--color-text-secondary);
+            font-size: 9px;
+            letter-spacing: 0.3px;
+        }
+
+        .topbar-title .auth {
+            color: var(--color-accent);
+            font-size: 9px;
+            margin-top: 1px;
+        }
+
+        .topbar-title .auth a {
+            color: var(--color-accent);
+            text-decoration: none;
+        }
+
+        .topbar-right {
+            width: 40px;
+        }
+
+        /* ========================================
+           SIDEBAR
+           ======================================== */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--color-overlay);
+            z-index: 998;
+            display: none;
+            opacity: 0;
+            transition: opacity var(--transition-normal);
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+            opacity: 1;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 280px;
+            height: 100%;
+            background: var(--color-bg-secondary);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            transition: left var(--transition-normal);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .sidebar.open {
+            left: 0;
+        }
+
+        .sidebar-header {
+            padding: 20px 16px;
+            border-bottom: 1px solid var(--color-border);
+            background: linear-gradient(135deg, #0D1117 0%, #161B22 100%);
+        }
+
+        .sidebar-header h2 {
+            color: var(--color-accent);
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-header .logo-icon {
+            width: 28px;
+            height: 28px;
+            background: var(--color-accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .sidebar-header .auth {
+            color: var(--color-text-secondary);
+            font-size: 11px;
+            margin-top: 6px;
+        }
+
+        .sidebar-header .auth a {
+            color: var(--color-accent);
+            text-decoration: none;
+        }
+
+        .sidebar-section {
+            padding: 12px 16px 4px 16px;
+            color: var(--color-text-secondary);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 13px 16px;
+            border: none;
+            background: none;
+            color: var(--color-text-primary);
+            font-size: 13px;
+            text-align: left;
+            width: 100%;
+            border-bottom: 1px solid rgba(26, 80, 139, 0.2);
+            cursor: pointer;
+            transition: background var(--transition-fast);
+        }
+
+        .sidebar-item:active {
+            background: var(--color-bg-tertiary);
+        }
+
+        .sidebar-item .icon {
+            width: 20px;
+            text-align: center;
+            font-size: 16px;
+            color: var(--color-accent);
+        }
+
+        .sidebar-item.active {
+            background: rgba(0, 212, 255, 0.1);
+            border-left: 3px solid var(--color-accent);
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 14px 16px;
+            border-top: 1px solid var(--color-border);
+            color: var(--color-text-secondary);
+            font-size: 10px;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .sidebar-footer a {
+            color: var(--color-accent);
+            text-decoration: none;
+        }
+
+        /* ========================================
+           HOME VIEW
+           ======================================== */
+        .home {
+            display: flex;
+            flex-direction: column;
+            height: calc(100% - 48px);
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .card {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: 12px;
+            margin: 10px;
+            transition: border-color var(--transition-fast);
+        }
+
+        .card:active {
+            border-color: var(--color-accent);
+        }
+
+        .card-title {
+            color: var(--color-accent);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* ========================================
+           INPUTS
+           ======================================== */
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--color-bg-tertiary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            color: white;
+            font-size: 14px;
+            margin-bottom: 10px;
+            outline: none;
+            transition: border-color var(--transition-fast);
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+
+        input:focus {
+            border-color: var(--color-accent);
+            box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.15);
+        }
+
+        input::placeholder {
+            color: var(--color-text-secondary);
+        }
+
+        /* ========================================
+           BUTTONS
+           ======================================== */
+        #toggleBtn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: var(--radius-lg);
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            letter-spacing: 0.5px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #toggleBtn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.3s, height 0.3s;
+        }
+
+        #toggleBtn:active::after {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-connect {
+            background: var(--color-accent);
+            color: var(--color-bg-primary);
+        }
+
+        .btn-disconnect {
+            background: var(--color-danger);
+            color: white;
+        }
+
+        .btn-connecting {
+            background: var(--color-warning);
+            color: var(--color-bg-primary);
+        }
+
+        /* ========================================
+           STATUS
+           ======================================== */
+        #status {
+            text-align: center;
+            font-size: 13px;
+            padding: 8px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .online .status-dot { background: var(--color-success); box-shadow: 0 0 8px var(--color-success); }
+        .offline .status-dot { background: var(--color-danger); }
+        .connecting .status-dot { background: var(--color-warning); animation: pulse 1s infinite; }
+
+        .online { color: var(--color-success); }
+        .offline { color: var(--color-danger); }
+        .connecting { color: var(--color-warning); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ========================================
+           NETWORK SCANNER
+           ======================================== */
+        .scan-title {
+            color: var(--color-text-secondary);
+            font-size: 11px;
+            margin: 12px 10px 6px 10px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .scan-item {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: 10px 12px;
+            margin: 0 10px 6px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: border-color var(--transition-fast);
+        }
+
+        .scan-ip {
+            color: var(--color-accent);
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px;
+        }
+
+        .scan-port {
+            color: var(--color-text-secondary);
+            font-size: 10px;
+        }
+
+        .scan-connect {
+            background: var(--color-accent);
+            border: none;
+            color: var(--color-bg-primary);
+            padding: 6px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform var(--transition-fast);
+        }
+
+        .scan-connect:active {
+            transform: scale(0.95);
+        }
+
+        .scan-refresh {
+            background: none;
+            border: 1px solid var(--color-border);
+            color: var(--color-accent);
+            padding: 6px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 11px;
+            margin: 6px 10px;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .scan-refresh:active {
+            background: var(--color-accent);
+            color: var(--color-bg-primary);
+        }
+
+        .scan-status {
+            color: var(--color-warning);
+            font-size: 11px;
+            margin: 2px 10px;
+        }
+
+        .scan-spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--color-warning);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ========================================
+           QUICK TIPS
+           ======================================== */
+        .tips-card {
+            background: linear-gradient(135deg, var(--color-bg-secondary), #1a2332);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: 14px;
+            margin: 10px;
+        }
+
+        .info {
+            font-size: 10px;
+            color: var(--color-text-secondary);
+            line-height: 1.6;
+        }
+
+        .info b {
+            color: var(--color-accent);
+            font-weight: 600;
+        }
+
+        .info .tip-icon {
+            margin-right: 4px;
+        }
+
+        /* ========================================
+           FEATURE CARDS
+           ======================================== */
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin: 0 10px;
+        }
+
+        .feature-card {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: 12px;
+            text-align: center;
+        }
+
+        .feature-card .feature-icon {
+            font-size: 24px;
+            margin-bottom: 6px;
+        }
+
+        .feature-card .feature-title {
+            color: var(--color-text-primary);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .feature-card .feature-desc {
+            color: var(--color-text-secondary);
+            font-size: 9px;
+            margin-top: 3px;
+            line-height: 1.3;
+        }
+
+        /* ========================================
+           FOOTER
+           ======================================== */
+        .footer {
+            text-align: center;
+            padding: 16px 10px 20px;
+            margin-top: auto;
+        }
+
+        .footer .ver {
+            color: var(--color-text-secondary);
+            font-size: 11px;
+        }
+
+        .footer .auth {
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .footer .nm {
+            color: var(--color-text-primary);
+            font-size: 12px;
+        }
+
+        .footer .nm b {
+            color: var(--color-accent);
+        }
+
+        .footer .tg {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            text-decoration: none;
+        }
+
+        /* ========================================
+           SCREEN VIEW
+           ======================================== */
+        #screenView {
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            position: fixed;
+            top: 48px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #000;
+            z-index: 100;
+        }
+
+        #screenContainer {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            touch-action: none;
+            min-height: 0;
+        }
+
+        #screenCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #000;
+            touch-action: none;
+        }
+
+        /* ========================================
+           CONTROLS BAR
+           ======================================== */
+        .controls-bar {
+            background: var(--color-bg-secondary);
+            border-top: 1px solid var(--color-border);
+            padding: 5px 6px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .ctrl-key {
+            background: var(--color-bg-tertiary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            color: white;
+            padding: 7px 8px;
+            font-size: 10px;
+            text-align: center;
+            min-width: 34px;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-weight: 500;
+        }
+
+        .ctrl-key:active {
+            background: var(--color-accent);
+            color: var(--color-bg-primary);
+            transform: scale(0.95);
+        }
+
+        .ctrl-key.special {
+            background: var(--color-border);
+            border-color: var(--color-accent);
+            color: var(--color-accent);
+        }
+
+        /* ========================================
+           QWERTY KEYBOARD
+           ======================================== */
+        .qwerty {
+            background: var(--color-bg-secondary);
+            border-top: 1px solid var(--color-border);
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            flex-shrink: 0;
+        }
+
+        .qwerty-row {
+            display: flex;
+            gap: 3px;
+            justify-content: center;
+        }
+
+        .qkey {
+            background: var(--color-bg-tertiary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            color: white;
+            padding: 8px 2px;
+            font-size: 11px;
+            text-align: center;
+            min-width: 26px;
+            flex: 1;
+            max-width: 34px;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-weight: 500;
+        }
+
+        .qkey:active {
+            background: var(--color-accent);
+            color: var(--color-bg-primary);
+            transform: scale(0.95);
+        }
+
+        .qkey.wide {
+            min-width: 40px;
+            flex: 1.5;
+        }
+
+        .qkey.special {
+            background: var(--color-border);
+            font-size: 10px;
+            color: var(--color-accent);
+        }
+
+        .qkey.space {
+            flex: 4;
+            max-width: none;
+        }
+
+        .qkey.num {
+            background: var(--color-accent);
+            color: var(--color-bg-primary);
+            font-weight: 700;
+        }
+
+        /* ========================================
+           PAGES
+           ======================================== */
+        .page {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--color-bg-primary);
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .page.active {
+            display: flex;
+        }
+
+        .page-header {
+            background: var(--color-bg-secondary);
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .page-header h3 {
+            color: var(--color-accent);
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .page-back {
+            background: none;
+            border: 1px solid var(--color-border);
+            color: var(--color-accent);
+            font-size: 12px;
+            padding: 6px 14px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .page-back:active {
+            background: var(--color-accent);
+            color: var(--color-bg-primary);
+        }
+
+        .page-content {
+            padding: 16px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .page-content h4 {
+            color: var(--color-accent);
+            margin: 16px 0 8px 0;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .page-content p {
+            color: var(--color-text-secondary);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        /* ========================================
+           TUTORIAL STEPS
+           ======================================== */
+        .step {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: 14px;
+            margin: 8px 0;
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+        }
+
+        .step-num {
+            color: var(--color-accent);
+            font-size: 20px;
+            font-weight: 800;
+            min-width: 28px;
+        }
+
+        .step-body {
+            flex: 1;
+        }
+
+        .step-title {
+            color: white;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .step-desc {
+            color: var(--color-text-secondary);
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        /* ========================================
+           SETTINGS
+           ======================================== */
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(26, 80, 139, 0.3);
+        }
+
+        .setting-label {
+            color: var(--color-text-primary);
+            font-size: 13px;
+        }
+
+        .setting-value {
+            color: var(--color-accent);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .setting-toggle {
+            width: 44px;
+            height: 24px;
+            border-radius: 12px;
+            background: var(--color-border);
+            position: relative;
+            cursor: pointer;
+            transition: background var(--transition-fast);
+        }
+
+        .setting-toggle.on {
+            background: var(--color-accent);
+        }
+
+        .setting-toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            transition: transform var(--transition-fast);
+        }
+
+        .setting-toggle.on::after {
+            transform: translateX(20px);
+        }
+
+        /* ========================================
+           CLIPBOARD
+           ======================================== */
+        .clip-textarea {
+            width: 100%;
+            min-height: 100px;
+            background: var(--color-bg-tertiary);
+            border: 1px solid var(--color-border);
+            color: white;
+            padding: 12px;
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            font-family: inherit;
+            resize: vertical;
+            outline: none;
+            transition: border-color var(--transition-fast);
+        }
+
+        .clip-textarea:focus {
+            border-color: var(--color-accent);
+        }
+
+        .clip-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .clip-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: var(--radius-md);
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+            transition: transform var(--transition-fast);
+        }
+
+        .clip-btn:active {
+            transform: scale(0.97);
+        }
+
+        .clip-btn.primary {
+            background: var(--color-accent);
+            color: var(--color-bg-primary);
+        }
+
+        .clip-btn.secondary {
+            background: var(--color-border);
+            color: white;
+        }
+
+        #clipStatus {
+            color: var(--color-success);
+            font-size: 11px;
+            margin-top: 8px;
+            min-height: 16px;
+        }
+
+        /* ========================================
+           HISTORY
+           ======================================== */
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(26, 80, 139, 0.3);
+        }
+
+        .history-ip {
+            color: var(--color-accent);
+            font-size: 13px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            cursor: pointer;
+            transition: opacity var(--transition-fast);
+        }
+
+        .history-ip:active {
+            opacity: 0.7;
+        }
+
+        .history-time {
+            color: var(--color-text-secondary);
+            font-size: 10px;
+        }
+
+        .history-delete {
+            background: none;
+            border: none;
+            color: var(--color-danger);
+            font-size: 14px;
+            padding: 4px 8px;
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            transition: background var(--transition-fast);
+        }
+
+        .history-delete:active {
+            background: rgba(248, 113, 113, 0.15);
+        }
+
+        /* ========================================
+           ABOUT PAGE
+           ======================================== */
+        .about-logo {
+            text-align: center;
+            padding: 30px 0 20px;
+        }
+
+        .about-logo .logo-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--color-bg-tertiary), var(--color-border));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            font-size: 36px;
+            border: 2px solid var(--color-accent);
+        }
+
+        .about-name {
+            color: var(--color-accent);
+            font-size: 22px;
+            font-weight: 800;
+            margin-top: 14px;
+        }
+
+        .about-version {
+            color: var(--color-text-secondary);
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .about-desc {
+            color: var(--color-text-primary);
+            font-size: 13px;
+            margin-top: 12px;
+        }
+
+        .about-links {
+            margin-top: 20px;
+        }
+
+        .about-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(26, 80, 139, 0.3);
+            color: var(--color-text-primary);
+            text-decoration: none;
+            font-size: 13px;
+        }
+
+        .about-link .link-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--color-bg-tertiary);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .about-link .link-text {
+            flex: 1;
+        }
+
+        .about-link .link-subtitle {
+            color: var(--color-text-secondary);
+            font-size: 10px;
+            margin-top: 2px;
+        }
+
+        .about-link .link-arrow {
+            color: var(--color-text-secondary);
+        }
+
+        /* ========================================
+           DEBUG LOG
+           ======================================== */
+        #debugLog {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.85);
+            color: var(--color-success);
+            font-size: 8px;
+            padding: 3px 6px;
+            z-index: 9999;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            max-height: 48px;
+            overflow-y: auto;
+            backdrop-filter: blur(4px);
+            border-top: 1px solid rgba(0, 212, 255, 0.2);
+        }
+
+        /* ========================================
+           UTILITIES
+           ======================================== */
+        .hidden { display: none !important; }
+        .flex-center { display: flex; align-items: center; justify-content: center; }
+        .text-center { text-align: center; }
+        .mt-8 { margin-top: 8px; }
+        .mt-12 { margin-top: 12px; }
+        .mb-8 { margin-bottom: 8px; }
+        .px-10 { padding-left: 10px; padding-right: 10px; }
+    </style>
+</head>
+<body>
+
+    <!-- ==========================================
+         TOP BAR
+         ========================================== -->
+    <div class="topbar">
+        <button class="hamburger" onclick="openSidebar()" aria-label="Menu">&#9776;</button>
+        <div class="topbar-title">
+            <h1>ScreenShare</h1>
+            <div class="sub">Wireless Display + Touch + Keyboard</div>
+            <div class="auth">by Jalal | <a href="https://t.me/x16_96">@x16_96</a></div>
+        </div>
+        <div class="topbar-right"></div>
+    </div>
+
+    <!-- ==========================================
+         SIDEBAR OVERLAY
+         ========================================== -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- ==========================================
+         SIDEBAR
+         ========================================== -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2><span class="logo-icon">&#9670;</span> ScreenShare</h2>
+            <div class="auth">by Jalal | <a href="https://t.me/x16_96">@x16_96</a></div>
+        </div>
+        <div class="sidebar-section">Navigation</div>
+        <button class="sidebar-item active" id="navHome" onclick="goHome()">
+            <span class="icon">&#8962;</span> Home
+        </button>
+        <button class="sidebar-item" id="navSettings" onclick="showPage('settingsPage')">
+            <span class="icon">&#9881;</span> Settings
+        </button>
+        <button class="sidebar-item" id="navClipboard" onclick="showPage('clipboardPage')">
+            <span class="icon">&#128203;</span> Clipboard
+        </button>
+        <button class="sidebar-item" id="navHistory" onclick="showPage('historyPage')">
+            <span class="icon">&#128336;</span> History
+        </button>
+        <div class="sidebar-section">Help</div>
+        <button class="sidebar-item" id="navTutorial" onclick="showPage('tutorialPage')">
+            <span class="icon">&#128214;</span> Tutorial
+        </button>
+        <button class="sidebar-item" id="navAbout" onclick="showPage('aboutPage')">
+            <span class="icon">&#9432;</span> About
+        </button>
+        <div class="sidebar-footer">
+            ScreenShare v3.2.0<br>
+            <a href="https://github.com/jalalmx32/screen-share">github.com/jalalmx32/screen-share</a>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         HOME VIEW
+         ========================================== -->
+    <div id="homeView" class="home">
+
+        <!-- Connection Card -->
+        <div class="card">
+            <div class="card-title">&#128268; Connection</div>
+            <input type="text" id="ipInput" placeholder="PC IP: 192.168.43.1:8765"
+                   oninput="save('ip', this.value)">
+            <input type="password" id="passInput" placeholder="Password (optional)"
+                   oninput="save('pass', this.value)">
+            <button id="toggleBtn" class="btn-connect"
+                    ontouchstart="toggleConnection(event)"
+                    onclick="toggleConnection(event)">Connect</button>
+        </div>
+
+        <!-- Status -->
+        <div id="status" class="offline">
+            <span class="status-dot"></span>
+            <span id="statusText">Offline</span>
+        </div>
+
+        <!-- Features Grid -->
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">&#128187;</div>
+                <div class="feature-title">Screen Mirror</div>
+                <div class="feature-desc">View PC screen in real-time</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#128400;</div>
+                <div class="feature-title">Touch Control</div>
+                <div class="feature-desc">Tap to click, drag to move</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#9000;</div>
+                <div class="feature-title">Full Keyboard</div>
+                <div class="feature-desc">QWERTY + special keys</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#128246;</div>
+                <div class="feature-title">Clipboard Sync</div>
+                <div class="feature-desc">Share text between devices</div>
+            </div>
+        </div>
+
+        <!-- Network Scanner -->
+        <div class="scan-title">
+            <span>&#128269;</span> Scanning for servers...
+        </div>
+        <div id="scanList"></div>
+        <div class="scan-status" id="scanStatus"></div>
+        <button class="scan-refresh" ontouchstart="startScan(event)" onclick="startScan(event)">
+            &#8635; Refresh
+        </button>
+
+        <!-- Quick Tips Card -->
+        <div class="tips-card">
+            <div class="card-title">&#128161; Quick Start</div>
+            <div class="info">
+                <span class="tip-icon">&#9312;</span> <b>1.</b> Enable hotspot on Android<br>
+                <span class="tip-icon">&#9313;</span> <b>2.</b> Connect PC to hotspot<br>
+                <span class="tip-icon">&#9314;</span> <b>3.</b> Start ScreenShare on PC<br>
+                <span class="tip-icon">&#9315;</span> <b>4.</b> Enter IP or tap server<br>
+                <span class="tip-icon">&#9316;</span> <b>5.</b> Touch to control PC!
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div class="ver">ScreenShare v3.2.0</div>
+            <div class="auth">
+                <span class="nm">by <b>Jalal</b></span>
+                <a class="tg" href="https://t.me/x16_96">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#00D4FF">
+                        <path d="M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm5.95 7.47l-1.97 9.28c-.15.67-.54.83-1.09.52l-3.02-2.22-1.46 1.4c-.16.16-.3.3-.61.3l.22-3.05 5.55-5.01c.24-.22-.05-.33-.37-.14L8.68 13.3l-2.96-.92c-.64-.2-.66-.64.13-.95l11.53-4.45c.53-.19 1 .13.83.95l-.23.09z"/>
+                    </svg>
+                    <span style="color:#00D4FF;font-size:12px;">@x16_96</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         SCREEN VIEW
+         ========================================== -->
+    <div id="screenView">
+        <div id="screenContainer">
+            <canvas id="screenCanvas"></canvas>
+        </div>
+
+        <!-- Control Keys -->
+        <div class="controls-bar">
+            <div class="ctrl-key special" ontouchstart="sendKey(event,'win')">Win</div>
+            <div class="ctrl-key special" ontouchstart="sendKey(event,'alt')">Alt</div>
+            <div class="ctrl-key special" ontouchstart="sendKey(event,'ctrl')">Ctrl</div>
+            <div class="ctrl-key special" ontouchstart="sendKey(event,'shift')">Shift</div>
+            <div class="ctrl-key" ontouchstart="sendKey(event,'alt_tab')">Alt+Tab</div>
+            <div class="ctrl-key" ontouchstart="sendKey(event,'ctrl_c')">C</div>
+            <div class="ctrl-key" ontouchstart="sendKey(event,'ctrl_v')">V</div>
+            <div class="ctrl-key" ontouchstart="sendKey(event,'up')">&#8593;</div>
+            <div class="ctrl-key" ontouchstart="sendKey(event,'down')">&#8595;</div>
+            <div class="ctrl-key" ontouchstart="sendKey(event,'left')">&#8592;</div>
+            <div class="ctrl-key" ontouchstart="sendKey(event,'right')">&#8594;</div>
+            <div class="ctrl-key" ontouchstart="sendKey(event,'delete')">Del</div>
+            <div class="ctrl-key" ontouchstart="sendKey(event,'escape')">Esc</div>
+        </div>
+
+        <!-- QWERTY Keyboard -->
+        <div class="qwerty">
+            <div class="qwerty-row">
+                <div class="qkey num" ontouchstart="sendChar(event,'1')">1</div>
+                <div class="qkey num" ontouchstart="sendChar(event,'2')">2</div>
+                <div class="qkey num" ontouchstart="sendChar(event,'3')">3</div>
+                <div class="qkey num" ontouchstart="sendChar(event,'4')">4</div>
+                <div class="qkey num" ontouchstart="sendChar(event,'5')">5</div>
+                <div class="qkey num" ontouchstart="sendChar(event,'6')">6</div>
+                <div class="qkey num" ontouchstart="sendChar(event,'7')">7</div>
+                <div class="qkey num" ontouchstart="sendChar(event,'8')">8</div>
+                <div class="qkey num" ontouchstart="sendChar(event,'9')">9</div>
+                <div class="qkey num" ontouchstart="sendChar(event,'0')">0</div>
+            </div>
+            <div class="qwerty-row">
+                <div class="qkey" ontouchstart="sendChar(event,'q')">Q</div>
+                <div class="qkey" ontouchstart="sendChar(event,'w')">W</div>
+                <div class="qkey" ontouchstart="sendChar(event,'e')">E</div>
+                <div class="qkey" ontouchstart="sendChar(event,'r')">R</div>
+                <div class="qkey" ontouchstart="sendChar(event,'t')">T</div>
+                <div class="qkey" ontouchstart="sendChar(event,'y')">Y</div>
+                <div class="qkey" ontouchstart="sendChar(event,'u')">U</div>
+                <div class="qkey" ontouchstart="sendChar(event,'i')">I</div>
+                <div class="qkey" ontouchstart="sendChar(event,'o')">O</div>
+                <div class="qkey" ontouchstart="sendChar(event,'p')">P</div>
+            </div>
+            <div class="qwerty-row">
+                <div class="qkey" ontouchstart="sendChar(event,'a')">A</div>
+                <div class="qkey" ontouchstart="sendChar(event,'s')">S</div>
+                <div class="qkey" ontouchstart="sendChar(event,'d')">D</div>
+                <div class="qkey" ontouchstart="sendChar(event,'f')">F</div>
+                <div class="qkey" ontouchstart="sendChar(event,'g')">G</div>
+                <div class="qkey" ontouchstart="sendChar(event,'h')">H</div>
+                <div class="qkey" ontouchstart="sendChar(event,'j')">J</div>
+                <div class="qkey" ontouchstart="sendChar(event,'k')">K</div>
+                <div class="qkey" ontouchstart="sendChar(event,'l')">L</div>
+            </div>
+            <div class="qwerty-row">
+                <div class="qkey wide special" ontouchstart="sendKey(event,'shift')">Shift</div>
+                <div class="qkey" ontouchstart="sendChar(event,'z')">Z</div>
+                <div class="qkey" ontouchstart="sendChar(event,'x')">X</div>
+                <div class="qkey" ontouchstart="sendChar(event,'c')">C</div>
+                <div class="qkey" ontouchstart="sendChar(event,'v')">V</div>
+                <div class="qkey" ontouchstart="sendChar(event,'b')">B</div>
+                <div class="qkey" ontouchstart="sendChar(event,'n')">N</div>
+                <div class="qkey" ontouchstart="sendChar(event,'m')">M</div>
+                <div class="qkey wide special" ontouchstart="sendKey(event,'backspace')">BS</div>
+            </div>
+            <div class="qwerty-row">
+                <div class="qkey wide special" ontouchstart="sendKey(event,'tab')">Tab</div>
+                <div class="qkey" ontouchstart="sendChar(event,' ')">,</div>
+                <div class="qkey space" ontouchstart="sendKey(event,'space')">Space</div>
+                <div class="qkey" ontouchstart="sendChar(event,'.')">.</div>
+                <div class="qkey wide special" ontouchstart="sendKey(event,'enter')">Enter</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         SETTINGS PAGE
+         ========================================== -->
+    <div class="page" id="settingsPage">
+        <div class="page-header">
+            <h3>&#9881; Settings</h3>
+            <button class="page-back" onclick="goHome()">&#8592; Back</button>
+        </div>
+        <div class="page-content">
+            <h4>&#128187; Display</h4>
+            <div class="setting-item">
+                <span class="setting-label">Stream Quality</span>
+                <span class="setting-value">720p</span>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Frame Rate</span>
+                <span class="setting-value">30 FPS</span>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Auto Reconnect</span>
+                <div class="setting-toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+
+            <h4>&#128274; Security</h4>
+            <div class="setting-item">
+                <span class="setting-label">Password Protection</span>
+                <div class="setting-toggle" id="passToggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Encrypted Connection</span>
+                <div class="setting-toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+
+            <h4>&#128190; Data</h4>
+            <div class="setting-item">
+                <span class="setting-label">Save Connection History</span>
+                <div class="setting-toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Remember IP Address</span>
+                <div class="setting-toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Clear All Data</span>
+                <button style="background:var(--color-danger);border:none;color:white;padding:6px 12px;border-radius:var(--radius-sm);font-size:11px;font-weight:600;cursor:pointer;"
+                        onclick="if(confirm('Clear all saved data?')){localStorage.clear();goHome();}">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         CLIPBOARD PAGE
+         ========================================== -->
+    <div class="page" id="clipboardPage">
+        <div class="page-header">
+            <h3>&#128203; Clipboard</h3>
+            <button class="page-back" onclick="goHome()">&#8592; Back</button>
+        </div>
+        <div class="page-content">
+            <p style="margin-bottom:12px;">Share clipboard content between your Android device and PC.</p>
+            <textarea id="clipText" class="clip-textarea"
+                      placeholder="Type or paste text here..."></textarea>
+            <div class="clip-buttons">
+                <button class="clip-btn primary" onclick="sendClipboard()">&#10148; Send to PC</button>
+                <button class="clip-btn secondary" onclick="getClipboard()">&#128229; Get from PC</button>
+            </div>
+            <div id="clipStatus"></div>
+
+            <h4>&#128221; Recent Clipboard Items</h4>
+            <div id="clipHistory">
+                <p style="color:var(--color-text-secondary);font-size:11px;">No clipboard history yet</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         HISTORY PAGE
+         ========================================== -->
+    <div class="page" id="historyPage">
+        <div class="page-header">
+            <h3>&#128336; History</h3>
+            <button class="page-back" onclick="goHome()">&#8592; Back</button>
+        </div>
+        <div class="page-content">
+            <div id="historyList">
+                <p style="color:var(--color-text-secondary);font-size:12px;text-align:center;padding:40px 0;">
+                    No connections yet. Connect to a server to see history.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         TUTORIAL PAGE
+         ========================================== -->
+    <div class="page" id="tutorialPage">
+        <div class="page-header">
+            <h3>&#128214; Tutorial</h3>
+            <button class="page-back" onclick="goHome()">&#8592; Back</button>
+        </div>
+        <div class="page-content">
+            <p style="margin-bottom:12px;">Follow these steps to set up screen sharing:</p>
+
+            <div class="step">
+                <div class="step-num">1</div>
+                <div class="step-body">
+                    <div class="step-title">&#128246; Enable Hotspot</div>
+                    <div class="step-desc">Turn on WiFi hotspot on your Android device. Make sure the hotspot is active and broadcasting.</div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-num">2</div>
+                <div class="step-body">
+                    <div class="step-title">&#128246; Connect PC</div>
+                    <div class="step-desc">Connect your PC to the Android hotspot. Go to WiFi settings on your PC and select the hotspot network.</div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-num">3</div>
+                <div class="step-body">
+                    <div class="step-title">&#128187; Start Server</div>
+                    <div class="step-desc">Run the ScreenShare server application on your Windows PC. It will start listening for connections.</div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-num">4</div>
+                <div class="step-body">
+                    <div class="step-title">&#128269; Auto Detect</div>
+                    <div class="step-desc">The app will automatically scan for available servers on the network. You can also manually enter the IP address.</div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-num">5</div>
+                <div class="step-body">
+                    <div class="step-title">&#128400; Touch &amp; Pinch</div>
+                    <div class="step-desc">Tap to click, long press for right-click, pinch to zoom in/out, and drag to pan around the screen.</div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-num">6</div>
+                <div class="step-body">
+                    <div class="step-title">&#9000; Keyboard</div>
+                    <div class="step-desc">Full QWERTY keyboard with special keys (Win, Alt, Ctrl, Shift, Tab, etc.) for complete PC control.</div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-num">7</div>
+                <div class="step-body">
+                    <div class="step-title">&#128203; Clipboard Sync</div>
+                    <div class="step-desc">Use the Clipboard feature to send and receive text between your Android device and PC seamlessly.</div>
+                </div>
+            </div>
+
+            <h4>&#9888; Troubleshooting</h4>
+            <div class="step">
+                <div class="step-num" style="color:var(--color-warning);">&#9888;</div>
+                <div class="step-body">
+                    <div class="step-title">Connection Issues?</div>
+                    <div class="step-desc">
+                        - Make sure both devices are on the same network<br>
+                        - Check that the PC firewall allows connections<br>
+                        - Try restarting both the server and this app<br>
+                        - Verify the IP address is correct
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         ABOUT PAGE
+         ========================================== -->
+    <div class="page" id="aboutPage">
+        <div class="page-header">
+            <h3>&#9432; About</h3>
+            <button class="page-back" onclick="goHome()">&#8592; Back</button>
+        </div>
+        <div class="page-content">
+            <div class="about-logo">
+                <div class="logo-circle">&#9670;</div>
+                <div class="about-name">ScreenShare</div>
+                <div class="about-version">Version 3.2.0</div>
+                <div class="about-desc">Wireless Display + Touch Control</div>
+                <p style="color:var(--color-text-secondary);font-size:11px;margin-top:8px;">A free alternative to Spacedesk</p>
+            </div>
+
+            <div class="about-links">
+                <a class="about-link" href="https://t.me/x16_96">
+                    <div class="link-icon">&#128172;</div>
+                    <div class="link-text">
+                        <div>Contact Developer</div>
+                        <div class="link-subtitle">@x16_96 on Telegram</div>
+                    </div>
+                    <div class="link-arrow">&#8250;</div>
+                </a>
+                <a class="about-link" href="https://github.com/jalalmx32/screen-share">
+                    <div class="link-icon">&#128187;</div>
+                    <div class="link-text">
+                        <div>Source Code</div>
+                        <div class="link-subtitle">github.com/jalalmx32/screen-share</div>
+                    </div>
+                    <div class="link-arrow">&#8250;</div>
+                </a>
+                <div class="about-link">
+                    <div class="link-icon">&#128736;</div>
+                    <div class="link-text">
+                        <div>Developer</div>
+                        <div class="link-subtitle">Jalal | @x16_96</div>
+                    </div>
+                </div>
+                <div class="about-link">
+                    <div class="link-icon">&#128196;</div>
+                    <div class="link-text">
+                        <div>License</div>
+                        <div class="link-subtitle">Free &amp; Open Source</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align:center;margin-top:24px;padding:16px;border-top:1px solid var(--color-border);">
+                <p style="color:var(--color-text-secondary);font-size:10px;line-height:1.6;">
+                    ScreenShare allows you to wirelessly mirror and control<br>
+                    your Windows PC from your Android device.<br><br>
+                    Features include real-time screen sharing,<br>
+                    touch input forwarding, keyboard control,<br>
+                    and clipboard synchronization.<br><br>
+                    Built with &#10084; for the open source community.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         DEBUG LOG
+         ========================================== -->
+    <div id="debugLog"></div>
+
+    <!-- ==========================================
+         JAVASCRIPT
+         ========================================== -->
+    <script>
+        // ========================================
+        // STATE MANAGEMENT
+        // ========================================
+        var ws = null;
+        var isConnected = false;
+        var atHome = true;
+        var canvasEl = null;
+        var ctx = null;
+        var zoom = 1;
+        var panX = 0;
+        var panY = 0;
+        var connectionStartTime = null;
+        var frameCount = 0;
+        var lastFrameTime = 0;
+        var fps = 0;
+
+        // ========================================
+        // PERSISTENCE
+        // ========================================
+        function getStore(key, defaultVal) {
+            try {
+                var s = JSON.parse(localStorage.getItem('ss') || '{}');
+                return s[key] !== undefined ? s[key] : defaultVal;
+            } catch (e) {
+                return defaultVal;
+            }
+        }
+
+        function save(key, val) {
+            try {
+                var s = JSON.parse(localStorage.getItem('ss') || '{}');
+                s[key] = val;
+                localStorage.setItem('ss', JSON.stringify(s));
+            } catch (e) {}
+        }
+
+        // Restore saved values
+        (function() {
+            try {
+                var ip = getStore('ip', '');
+                var pass = getStore('pass', '');
+                if (ip) document.getElementById('ipInput').value = ip;
+                if (pass) document.getElementById('passInput').value = pass;
+            } catch (e) {}
+        })();
+
+        // ========================================
+        // DEBUG LOG
+        // ========================================
+        function dbg(msg) {
+            var el = document.getElementById('debugLog');
+            if (el) {
+                var time = new Date().toLocaleTimeString();
+                el.innerHTML = '<span style="color:#888;">[' + time + ']</span> ' + msg + '<br>';
+                el.scrollTop = el.scrollHeight;
+            }
+        }
+
+        // ========================================
+        // SIDEBAR
+        // ========================================
+        function openSidebar() {
+            document.getElementById('sidebar').classList.add('open');
+            document.getElementById('sidebarOverlay').classList.add('active');
+            // Update active nav item
+            document.querySelectorAll('.sidebar-item').forEach(function(item) {
+                item.classList.remove('active');
+            });
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('sidebarOverlay').classList.remove('active');
+        }
+
+        // ========================================
+        // NAVIGATION
+        // ========================================
+        function goHome() {
+            closeSidebar();
+            document.querySelectorAll('.page').forEach(function(p) {
+                p.classList.remove('active');
+            });
+            document.getElementById('homeView').style.display = 'flex';
+            document.getElementById('screenView').style.display = 'none';
+            try { Android.setPage('home'); } catch (e) {}
+            if (isConnected) {
+                isConnected = false;
+                if (ws) {
+                    try { ws.close(); } catch (x) {}
+                    ws = null;
+                }
+                setBtn('Connect', 'btn-connect');
+                setStatus('Offline', 'offline');
+            }
+            atHome = true;
+            loadHistory();
+            // Reset nav
+            document.querySelectorAll('.sidebar-item').forEach(function(item) {
+                item.classList.remove('active');
+            });
+            var navHome = document.getElementById('navHome');
+            if (navHome) navHome.classList.add('active');
+        }
+
+        function showPage(id) {
+            closeSidebar();
+            document.querySelectorAll('.page').forEach(function(p) {
+                p.classList.remove('active');
+            });
+            document.getElementById(id).classList.add('active');
+            try { Android.setPage('page'); } catch (e) {}
+            atHome = false;
+            // Update nav
+            document.querySelectorAll('.sidebar-item').forEach(function(item) {
+                item.classList.remove('active');
+            });
+            if (id === 'historyPage') loadHistory();
+        }
+
+        // ========================================
+        // PINCH ZOOM & PAN
+        // ========================================
+        (function() {
+            var lc = document.getElementById('screenCanvas');
+            if (!lc) return;
+            var lastDist = 0;
+            var lastX = 0;
+            var lastY = 0;
+            var pinch = false;
+            var drag = false;
+
+            lc.addEventListener('touchstart', function(e) {
+                if (e.touches.length === 2) {
+                    pinch = true;
+                    drag = false;
+                    var dx = e.touches[0].clientX - e.touches[1].clientX;
+                    var dy = e.touches[0].clientY - e.touches[1].clientY;
+                    lastDist = Math.sqrt(dx * dx + dy * dy);
+                    e.preventDefault();
+                } else if (e.touches.length === 1) {
+                    drag = true;
+                    lastX = e.touches[0].clientX;
+                    lastY = e.touches[0].clientY;
+                }
+            }, { passive: false });
+
+            lc.addEventListener('touchmove', function(e) {
+                if (pinch && e.touches.length === 2) {
+                    var dx = e.touches[0].clientX - e.touches[1].clientX;
+                    var dy = e.touches[0].clientY - e.touches[1].clientY;
+                    var d = Math.sqrt(dx * dx + dy * dy);
+                    zoom = Math.max(0.5, Math.min(5, zoom * (d / lastDist)));
+                    lastDist = d;
+                    updateTransform();
+                    e.preventDefault();
+                } else if (drag && e.touches.length === 1 && !pinch) {
+                    panX += e.touches[0].clientX - lastX;
+                    panY += e.touches[0].clientY - lastY;
+                    lastX = e.touches[0].clientX;
+                    lastY = e.touches[0].clientY;
+                    updateTransform();
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            lc.addEventListener('touchend', function(e) {
+                if (e.touches.length < 2) pinch = false;
+                if (e.touches.length === 0) drag = false;
+            });
+        })();
+
+        function updateTransform() {
+            if (canvasEl) {
+                canvasEl.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + zoom + ')';
+            }
+        }
+
+        function resetView() {
+            zoom = 1;
+            panX = 0;
+            panY = 0;
+            updateTransform();
+        }
+
+        // ========================================
+        // NETWORK SCANNER
+        // ========================================
+        var scannedHosts = [];
+
+        function startScan(e) {
+            if (e) e.preventDefault();
+            document.getElementById('scanStatus').innerHTML = '<span class="scan-spinner"></span> Scanning...';
+            document.getElementById('scanList').innerHTML = '';
+
+            var base = '192.168.';
+            var ip = document.getElementById('ipInput').value.trim();
+            if (ip) {
+                var p = ip.split('.');
+                if (p.length >= 3) base = p[0] + '.' + p[1] + '.';
+            }
+
+            var hosts = [];
+            for (var i = 1; i <= 15; i++) hosts.push(base + '1.' + i);
+            hosts.push(base + '43.1');
+            hosts.push(base + '0.1');
+            hosts.push(base + '1.1');
+
+            var found = 0;
+            var checked = 0;
+
+            hosts.forEach(function(h) {
+                try {
+                    var t = new WebSocket('ws://' + h + ':8765');
+                    var host = h;
+                    var timer = setTimeout(function() {
+                        t.close();
+                        checked++;
+                        if (checked >= hosts.length) scanDone(found);
+                    }, 1200);
+
+                    t.onopen = function() {
+                        clearTimeout(timer);
+                        found++;
+                        checked++;
+                        addScanItem(host);
+                        t.close();
+                        if (checked >= hosts.length) scanDone(found);
+                    };
+
+                    t.onerror = function() {
+                        clearTimeout(timer);
+                        checked++;
+                        if (checked >= hosts.length) scanDone(found);
+                    };
+                } catch (x) {
+                    checked++;
+                }
+            });
+        }
+
+        function scanDone(n) {
+            document.getElementById('scanStatus').innerHTML = n > 0
+                ? '&#10003; Found ' + n + ' server(s)'
+                : '&#10007; No servers found';
+        }
+
+        function addScanItem(ip) {
+            var el = document.getElementById('scanList');
+            var d = document.createElement('div');
+            d.className = 'scan-item';
+
+            var parts = ip.split(':');
+            var ipAddr = parts[0];
+            var port = parts[1] || '8765';
+
+            d.innerHTML = '<div>' +
+                '<div class="scan-ip">' + ipAddr + '</div>' +
+                '<div class="scan-port">Port: ' + port + '</div>' +
+                '</div>';
+
+            var btn = document.createElement('button');
+            btn.className = 'scan-connect';
+            btn.textContent = 'Connect';
+
+            var handler = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                document.getElementById('ipInput').value = ip;
+                toggleConnection(e);
+            };
+
+            btn.ontouchstart = handler;
+            btn.onclick = handler;
+            d.appendChild(btn);
+            el.appendChild(d);
+        }
+
+        // ========================================
+        // CONNECTION
+        // ========================================
+        function toggleConnection(e) {
+            if (e) e.preventDefault();
+            dbg('Toggle connection');
+
+            if (isConnected) {
+                // Disconnect
+                isConnected = false;
+                atHome = true;
+                if (ws) {
+                    try { ws.close(); } catch (x) {}
+                    ws = null;
+                }
+                document.getElementById('homeView').style.display = 'flex';
+                document.getElementById('screenView').style.display = 'none';
+                setBtn('Connect', 'btn-connect');
+                setStatus('Offline', 'offline');
+                resetView();
+                try { Android.setPage('home'); } catch (e) {}
+                dbg('Disconnected');
+            } else {
+                // Connect
+                var ip = '';
+                try { ip = document.getElementById('ipInput').value.trim(); } catch (x) {}
+                dbg('IP=[' + ip + ']');
+
+                if (!ip) {
+                    dbg('No IP provided');
+                    return;
+                }
+
+                if (ip.indexOf(':') === -1) ip += ':8765';
+
+                var pass = '';
+                try { pass = document.getElementById('passInput').value; } catch (x) {}
+
+                try {
+                    save('ip', ip);
+                    save('pass', pass);
+                } catch (x) {}
+
+                setStatus('Connecting...', 'connecting');
+                setBtn('Connecting...', 'btn-connecting');
+                dbg('Connecting ws://' + ip);
+
+                try {
+                    ws = new WebSocket('ws://' + ip);
+                    ws.binaryType = 'arraybuffer';
+                    dbg('WebSocket created');
+
+                    ws.onopen = function() {
+                        dbg('CONNECTED to ' + ip);
+                        connectionStartTime = Date.now();
+                        frameCount = 0;
+
+                        if (pass) {
+                            ws.send(JSON.stringify({ type: 'auth', password: pass }));
+                        }
+
+                        isConnected = true;
+                        atHome = false;
+
+                        setStatus('Connected!', 'online');
+                        setBtn('Disconnect', 'btn-disconnect');
+
+                        document.getElementById('homeView').style.display = 'none';
+                        document.getElementById('screenView').style.display = 'flex';
+
+                        try { Android.setPage('screen'); } catch (e) {}
+
+                        saveHistory(ip);
+                        canvasEl = document.getElementById('screenCanvas');
+                        if (canvasEl) ctx = canvasEl.getContext('2d');
+                        dbg('Screen view ready');
+                    };
+
+                    // IMAGE HANDLER
+                    ws.onmessage = function(e) {
+                        if (e.data instanceof ArrayBuffer) {
+                            try {
+                                var b = new Blob([e.data], { type: 'image/jpeg' });
+                                var u = URL.createObjectURL(b);
+                                var tmp = new Image();
+
+                                tmp.onload = function() {
+                                    if (canvasEl && ctx) {
+                                        canvasEl.width = tmp.width;
+                                        canvasEl.height = tmp.height;
+                                        ctx.drawImage(tmp, 0, 0);
+                                        frameCount++;
+
+                                        // Calculate FPS every second
+                                        var now = Date.now();
+                                        if (now - lastFrameTime >= 1000) {
+                                            fps = Math.round(frameCount * 1000 / (now - lastFrameTime));
+                                            frameCount = 0;
+                                            lastFrameTime = now;
+                                        }
+                                    }
+                                    URL.revokeObjectURL(u);
+                                };
+
+                                tmp.onerror = function() {
+                                    dbg('Image load error');
+                                    URL.revokeObjectURL(u);
+                                };
+
+                                tmp.src = u;
+                            } catch (ex) {
+                                dbg('Error: ' + ex.message);
+                            }
+                        } else {
+                            // Handle text messages (clipboard, auth response, etc.)
+                            try {
+                                var msg = JSON.parse(e.data);
+                                if (msg.type === 'clipboard') {
+                                    document.getElementById('clipText').value = msg.text || '';
+                                    document.getElementById('clipStatus').textContent = 'Received from PC!';
+                                    dbg('Clipboard received');
+                                } else if (msg.type === 'auth_ok') {
+                                    dbg('Authentication successful');
+                                } else if (msg.type === 'auth_error') {
+                                    dbg('Authentication failed');
+                                    goHome();
+                                }
+                            } catch (ex) {
+                                dbg('Text: ' + e.data.substring(0, 80));
+                            }
+                        }
+                    };
+
+                    ws.onclose = function(e) {
+                        dbg('Connection closed: ' + e.code);
+                        isConnected = false;
+                        goHome();
+                    };
+
+                    ws.onerror = function() {
+                        dbg('WebSocket error');
+                        isConnected = false;
+                        goHome();
+                    };
+
+                } catch (ex) {
+                    dbg('Exception: ' + ex.message);
+                    goHome();
+                }
+            }
+        }
+
+        // ========================================
+        // UI HELPERS
+        // ========================================
+        function setBtn(text, className) {
+            var b = document.getElementById('toggleBtn');
+            b.textContent = text;
+            b.className = className;
+        }
+
+        function setStatus(text, className) {
+            var s = document.getElementById('status');
+            var statusText = document.getElementById('statusText');
+            s.className = className;
+            statusText.textContent = text;
+        }
+
+        // ========================================
+        // TOUCH & KEYBOARD INPUT
+        // ========================================
+        function sendTouchToServer(type, x, y) {
+            if (ws && ws.readyState === 1) {
+                ws.send(JSON.stringify({ type: type, x: x, y: y }));
+            }
+        }
+
+        function sendKey(e, key) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (ws && ws.readyState === 1) {
+                ws.send(JSON.stringify({ type: 'key', key: key }));
+            }
+        }
+
+        function sendChar(e, char) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (ws && ws.readyState === 1) {
+                ws.send(JSON.stringify({ type: 'char', char: char }));
+            }
+        }
+
+        // ========================================
+        // CLIPBOARD
+        // ========================================
+        function sendClipboard() {
+            var text = document.getElementById('clipText').value;
+            if (ws && ws.readyState === 1) {
+                ws.send(JSON.stringify({ type: 'clipboard', text: text }));
+                document.getElementById('clipStatus').textContent = '&#10003; Sent to PC!';
+                // Save to clipboard history
+                saveClipHistory(text);
+            } else {
+                document.getElementById('clipStatus').textContent = '&#10007; Not connected';
+            }
+        }
+
+        function getClipboard() {
+            if (ws && ws.readyState === 1) {
+                ws.send(JSON.stringify({ type: 'get_clipboard' }));
+                document.getElementById('clipStatus').textContent = 'Requesting from PC...';
+            } else {
+                document.getElementById('clipStatus').textContent = '&#10007; Not connected';
+            }
+        }
+
+        function saveClipHistory(text) {
+            if (!text) return;
+            var h = JSON.parse(localStorage.getItem('clipHist') || '[]');
+            h = h.filter(function(item) { return item.text !== text; });
+            h.unshift({ text: text, time: new Date().toLocaleString() });
+            if (h.length > 20) h = h.slice(0, 20);
+            localStorage.setItem('clipHist', JSON.stringify(h));
+        }
+
+        function loadClipHistory() {
+            var h = JSON.parse(localStorage.getItem('clipHist') || '[]');
+            var el = document.getElementById('clipHistory');
+            if (h.length === 0) {
+                el.innerHTML = '<p style="color:var(--color-text-secondary);font-size:11px;text-align:center;padding:16px 0;">No clipboard history yet</p>';
+                return;
+            }
+            el.innerHTML = '';
+            h.forEach(function(item) {
+                var d = document.createElement('div');
+                d.className = 'history-item';
+                d.innerHTML = '<div>' +
+                    '<div class="history-ip" style="font-size:12px;font-family:inherit;color:var(--color-text-primary);cursor:pointer;">' +
+                    item.text.substring(0, 60) + (item.text.length > 60 ? '...' : '') + '</div>' +
+                    '<div class="history-time">' + item.time + '</div>' +
+                    '</div>';
+                d.querySelector('.history-ip').onclick = function() {
+                    document.getElementById('clipText').value = item.text;
+                };
+                el.appendChild(d);
+            });
+        }
+
+        // ========================================
+        // CONNECTION HISTORY
+        // ========================================
+        function saveHistory(ip) {
+            var h = JSON.parse(localStorage.getItem('hist') || '[]');
+            h = h.filter(function(i) { return i !== ip; });
+            h.unshift(ip);
+            if (h.length > 15) h = h.slice(0, 15);
+            localStorage.setItem('hist', JSON.stringify(h));
+        }
+
+        function loadHistory() {
+            var h = JSON.parse(localStorage.getItem('hist') || '[]');
+            var el = document.getElementById('historyList');
+            if (h.length === 0) {
+                el.innerHTML = '<p style="color:var(--color-text-secondary);font-size:12px;text-align:center;padding:40px 0;">No connections yet. Connect to a server to see history.</p>';
+                return;
+            }
+            el.innerHTML = '';
+            h.forEach(function(ip) {
+                var d = document.createElement('div');
+                d.className = 'history-item';
+
+                var sp = document.createElement('div');
+                sp.style.cssText = 'flex:1;';
+
+                var ipSpan = document.createElement('div');
+                ipSpan.className = 'history-ip';
+                ipSpan.textContent = ip;
+                ipSpan.onclick = function() {
+                    document.getElementById('ipInput').value = ip;
+                    goHome();
+                };
+                sp.appendChild(ipSpan);
+
+                var del = document.createElement('button');
+                del.className = 'history-delete';
+                del.textContent = '&#10005;';
+                del.onclick = function() {
+                    var h2 = JSON.parse(localStorage.getItem('hist') || '[]');
+                    h2 = h2.filter(function(i) { return i !== ip; });
+                    localStorage.setItem('hist', JSON.stringify(h2));
+                    loadHistory();
+                };
+
+                d.appendChild(sp);
+                d.appendChild(del);
+                el.appendChild(d);
+            });
+        }
+
+        // ========================================
+        // INITIALIZATION
+        // ========================================
+        document.addEventListener('DOMContentLoaded', function() {
+            loadHistory();
+            loadClipHistory();
+            dbg('ScreenShare v3.2.0 ready');
+        });
+    </script>
+</body>
+</html>
