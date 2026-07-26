@@ -74,20 +74,38 @@ public class MainActivity extends Activity {
         "*{margin:0;padding:0;box-sizing:border-box;}" +
         "body{background:#0D1117;color:#e0e0e0;font-family:-apple-system,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;}" +
 
-        ".header{text-align:center;padding:10px;background:#161B22;border-bottom:1px solid #1a508b;}" +
-        "h1{color:#00D4FF;font-size:18px;}" +
-        ".sub{color:#888;font-size:10px;}" +
-        ".author{color:#00D4FF;font-size:11px;margin-top:2px;}" +
-        ".author a{color:#00D4FF;text-decoration:none;}" +
+        /* Top bar with hamburger */
+        ".topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#161B22;border-bottom:1px solid #1a508b;}" +
+        ".hamburger{background:none;border:none;color:#00D4FF;font-size:22px;padding:4px 8px;cursor:pointer;}" +
+        ".topbar-title{text-align:center;flex:1;}" +
+        ".topbar-title h1{color:#00D4FF;font-size:18px;}" +
+        ".topbar-title .sub{color:#888;font-size:10px;}" +
+        ".topbar-title .author{color:#00D4FF;font-size:11px;}" +
+        ".topbar-title .author a{color:#00D4FF;text-decoration:none;}" +
 
+        /* Sidebar overlay */
+        ".sidebar-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:998;display:none;}" +
+        ".sidebar-overlay.active{display:block;}" +
+
+        /* Sidebar menu */
+        ".sidebar{position:fixed;top:0;left:-280px;width:280px;height:100%;background:#161B22;z-index:999;display:flex;flex-direction:column;transition:left 0.3s;box-shadow:4px 0 16px rgba(0,0,0,0.5);}" +
+        ".sidebar.open{left:0;}" +
+        ".sidebar-header{padding:20px 16px;border-bottom:1px solid #1a508b;}" +
+        ".sidebar-header h2{color:#00D4FF;font-size:18px;}" +
+        ".sidebar-header .author{color:#888;font-size:11px;margin-top:4px;}" +
+        ".sidebar-header .author a{color:#00D4FF;text-decoration:none;}" +
+        ".sidebar-item{display:flex;align-items:center;padding:14px 16px;border:none;background:none;color:#e0e0e0;font-size:14px;text-align:left;width:100%;border-bottom:1px solid #1a508b33;}" +
+        ".sidebar-item:active{background:#0f3460;}" +
+        ".sidebar-item .icon{width:24px;text-align:center;margin-right:12px;font-size:16px;}" +
+        ".sidebar-footer{margin-top:auto;padding:12px 16px;border-top:1px solid #1a508b;color:#888;font-size:10px;text-align:center;}" +
+
+        /* Main content */
         ".card{background:#161B22;border:1px solid #1a508b;border-radius:8px;padding:12px;margin:8px;}" +
         "input{width:100%;padding:10px;background:#0f3460;border:1px solid #1a508b;border-radius:6px;color:white;font-size:14px;margin-bottom:8px;}" +
         "input:focus{outline:none;border-color:#00D4FF;}" +
-
         "#status{text-align:center;font-size:12px;padding:6px;}" +
         ".online{color:#4ADE80;} .offline{color:#F87171;} .connecting{color:#FBBF24;}" +
 
-        /* Main toggle button */
         "#toggleBtn{width:100%;padding:14px;border:none;border-radius:8px;font-size:16px;font-weight:bold;}" +
         ".btn-connect{background:#00D4FF;color:#0D1117;}" +
         ".btn-disconnect{background:#F87171;color:white;}" +
@@ -103,53 +121,60 @@ public class MainActivity extends Activity {
         ".kbd{background:#0f3460;border:1px solid #1a508b;border-radius:4px;color:white;padding:6px 8px;font-size:11px;text-align:center;min-width:32px;}" +
         ".kbd:active{background:#00D4FF;color:#0D1117;}" +
         ".kbd.special{background:#1a508b;border-color:#00D4FF;}" +
-
         "#kbToggle{background:#1a508b;color:white;width:auto;padding:4px 10px;font-size:10px;border-radius:4px;position:absolute;right:8px;top:50%;transform:translateY(-50%);z-index:10;}" +
 
         ".info{font-size:10px;color:#888;line-height:1.4;padding:0 8px 8px 8px;}" +
         ".info b{color:#00D4FF;}" +
 
-        ".about-page{position:fixed;top:0;left:0;width:100%;height:100%;background:#0D1117;z-index:2000;display:none;flex-direction:column;overflow-y:auto;}" +
-        ".about-page.active{display:flex;}" +
-        ".about-header{background:#161B22;padding:16px;border-bottom:1px solid #1a508b;display:flex;align-items:center;justify-content:space-between;}" +
-        ".about-header h3{color:#00D4FF;font-size:16px;}" +
-        ".about-back{background:none;border:none;color:#00D4FF;font-size:14px;}" +
-        ".about-content{padding:16px;}" +
-        ".about-content h4{color:#00D4FF;margin:16px 0 8px 0;}" +
-        ".about-content p{color:#888;font-size:12px;line-height:1.6;}" +
-
-        ".tutorial-page{position:fixed;top:0;left:0;width:100%;height:100%;background:#0D1117;z-index:2000;display:none;flex-direction:column;overflow-y:auto;}" +
-        ".tutorial-page.active{display:flex;}" +
+        ".page{position:fixed;top:0;left:0;width:100%;height:100%;background:#0D1117;z-index:2000;display:none;flex-direction:column;overflow-y:auto;}" +
+        ".page.active{display:flex;}" +
+        ".page-header{background:#161B22;padding:14px;border-bottom:1px solid #1a508b;display:flex;align-items:center;justify-content:space-between;}" +
+        ".page-header h3{color:#00D4FF;font-size:16px;}" +
+        ".page-back{background:none;border:none;color:#00D4FF;font-size:14px;}" +
+        ".page-content{padding:16px;}" +
+        ".page-content h4{color:#00D4FF;margin:16px 0 8px 0;}" +
+        ".page-content p{color:#888;font-size:12px;line-height:1.6;}" +
         ".step{background:#161B22;border:1px solid #1a508b;border-radius:8px;padding:12px;margin:8px;}" +
         ".step-num{color:#00D4FF;font-size:20px;font-weight:bold;}" +
         ".step-title{color:white;font-size:13px;font-weight:bold;margin:4px 0;}" +
         ".step-desc{color:#888;font-size:11px;line-height:1.4;}" +
         ".step-key{display:inline-block;background:#0f3460;border:1px solid #1a508b;border-radius:4px;padding:2px 6px;color:#00D4FF;font-size:10px;margin:2px;}" +
-
-        ".overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:999;display:none;align-items:center;justify-content:center;}" +
-        ".overlay.active{display:flex;}" +
-        ".menu-box{background:#161B22;border:1px solid #1a508b;border-radius:12px;padding:20px;width:260px;}" +
-        ".menu-box h3{color:#00D4FF;font-size:16px;text-align:center;margin-bottom:16px;}" +
-        ".menu-item{width:100%;padding:12px;border:none;border-radius:8px;font-size:14px;font-weight:bold;margin-bottom:8px;text-align:left;}" +
-        ".menu-item.normal{background:#0f3460;color:white;}" +
-        ".menu-item.about{background:#1a508b;color:#00D4FF;}" +
-
-        ".menu-btn{position:fixed;bottom:16px;right:16px;width:48px;height:48px;border-radius:24px;background:#0f3460;border:1px solid #1a508b;font-size:14px;z-index:1000;display:none;color:white;box-shadow:0 4px 12px rgba(0,0,0,0.4);}" +
         "</style></head><body>" +
 
-        "<div class='header'>" +
-        "  <h1>ScreenShare</h1>" +
-        "  <div class='sub'>Wireless Display + Touch + Keyboard</div>" +
-        "  <div class='author'>by Jalal | <a href='https://t.me/x16_96'>@x16_96</a></div>" +
+        /* Top bar */
+        "<div class='topbar'>" +
+        "  <button class='hamburger' onclick='openSidebar()'>\u2630</button>" +
+        "  <div class='topbar-title'>" +
+        "    <h1>ScreenShare</h1>" +
+        "    <div class='sub'>Wireless Display + Touch + Keyboard</div>" +
+        "  </div>" +
+        "  <div style='width:40px;'></div>" +
         "</div>" +
 
+        /* Sidebar overlay */
+        "<div class='sidebar-overlay' id='sidebarOverlay' onclick='closeSidebar()'></div>" +
+
+        /* Sidebar menu */
+        "<div class='sidebar' id='sidebar'>" +
+        "  <div class='sidebar-header'>" +
+        "    <h2>ScreenShare</h2>" +
+        "    <div class='author'>by Jalal | <a href='https://t.me/x16_96'>@x16_96</a></div>" +
+        "  </div>" +
+        "  <button class='sidebar-item' onclick='closeSidebar()'><span class='icon'>\u2302</span>Home</button>" +
+        "  <button class='sidebar-item' onclick='showTutorial()'><span class='icon'>\u24D8</span>Tutorial</button>" +
+        "  <button class='sidebar-item' onclick='showAbout()'><span class='icon'>\u2139</span>About</button>" +
+        "  <button class='sidebar-item' onclick='closeSidebar()'><span class='icon'>\u2699</span>Settings</button>" +
+        "  <div class='sidebar-footer'>ScreenShare v1.8.0<br>github.com/jalalmx32/screen-share</div>" +
+        "</div>" +
+
+        /* Connection card */
         "<div class='card' id='connectCard'>" +
         "  <input type='text' id='ipInput' placeholder='PC IP: 192.168.43.1:8765'>" +
         "  <button id='toggleBtn' class='btn-connect' onclick='toggleConnection()'>Connect</button>" +
         "</div>" +
-
         "<div id='status' class='offline'>Offline</div>" +
 
+        /* Screen area */
         "<div id='screen'>" +
         "  <div style='position:relative;'>" +
         "    <button id='kbToggle' onclick='toggleKeyboard()'>Keyboard</button>" +
@@ -189,21 +214,10 @@ public class MainActivity extends Activity {
         "  </div>" +
         "</div>" +
 
-        "<button class='menu-btn' id='menuBtn' onclick='openMenu()'>Menu</button>" +
-
-        "<div class='overlay' id='homeMenu'>" +
-        "  <div class='menu-box'>" +
-        "    <h3>Menu</h3>" +
-        "    <button class='menu-item normal' onclick='closeMenu()'>Settings</button>" +
-        "    <button class='menu-item about' onclick='showAbout()'>About</button>" +
-        "    <button class='menu-item about' onclick='showTutorial()'>Tutorial</button>" +
-        "    <button class='menu-item normal' onclick='closeMenu()' style='background:#161B22;border:1px solid #1a508b;'>Cancel</button>" +
-        "  </div>" +
-        "</div>" +
-
-        "<div class='about-page' id='aboutPage'>" +
-        "  <div class='about-header'><h3>About</h3><button class='about-back' onclick='hideAbout()'>Back</button></div>" +
-        "  <div class='about-content'>" +
+        /* About page */
+        "<div class='page' id='aboutPage'>" +
+        "  <div class='page-header'><h3>About</h3><button class='page-back' onclick='hideAbout()'>Back</button></div>" +
+        "  <div class='page-content'>" +
         "    <h4>ScreenShare</h4>" +
         "    <p>Wireless Display + Touch Control for Android</p>" +
         "    <p>A free alternative to Spacedesk</p>" +
@@ -215,12 +229,13 @@ public class MainActivity extends Activity {
         "    <p>Jalal | @x16_96</p>" +
         "    <p>GitHub: github.com/jalalmx32/screen-share</p>" +
         "    <h4>Version</h4>" +
-        "    <p>v1.7.0</p>" +
+        "    <p>v1.8.0</p>" +
         "  </div>" +
         "</div>" +
 
-        "<div class='tutorial-page' id='tutorialPage'>" +
-        "  <div class='about-header'><h3>Tutorial</h3><button class='about-back' onclick='hideTutorial()'>Back</button></div>" +
+        /* Tutorial page */
+        "<div class='page' id='tutorialPage'>" +
+        "  <div class='page-header'><h3>Tutorial</h3><button class='page-back' onclick='hideTutorial()'>Back</button></div>" +
         "  <div class='step'><div class='step-num'>1</div><div class='step-title'>Enable Hotspot</div><div class='step-desc'>Turn on WiFi hotspot on your Android phone</div></div>" +
         "  <div class='step'><div class='step-num'>2</div><div class='step-title'>Connect PC</div><div class='step-desc'>Connect your Windows PC to the hotspot network</div></div>" +
         "  <div class='step'><div class='step-num'>3</div><div class='step-title'>Start Server</div><div class='step-desc'>Run ScreenShare on Windows and note the IP address</div></div>" +
@@ -231,84 +246,66 @@ public class MainActivity extends Activity {
 
         "<script>" +
         "var ws=null;var isConnected=false;" +
-        "" +
-        "function toggleConnection(){" +
-        "  if(isConnected){disconnect();}else{connect();}" +
+
+        /* Sidebar */
+        "function openSidebar(){" +
+        "  document.getElementById('sidebar').classList.add('open');" +
+        "  document.getElementById('sidebarOverlay').classList.add('active');" +
         "}" +
-        "" +
+        "function closeSidebar(){" +
+        "  document.getElementById('sidebar').classList.remove('open');" +
+        "  document.getElementById('sidebarOverlay').classList.remove('active');" +
+        "}" +
+
+        /* Pages */
+        "function showAbout(){closeSidebar();document.getElementById('aboutPage').classList.add('active');}" +
+        "function hideAbout(){document.getElementById('aboutPage').classList.remove('active');}" +
+        "function showTutorial(){closeSidebar();document.getElementById('tutorialPage').classList.add('active');}" +
+        "function hideTutorial(){document.getElementById('tutorialPage').classList.remove('active');}" +
+
+        /* Connection */
+        "function toggleConnection(){if(isConnected)disconnect();else connect();}" +
         "function connect(){" +
         "  var ip=document.getElementById('ipInput').value.trim();" +
         "  if(!ip){alert('Enter IP');return;}" +
         "  if(!ip.startsWith('ws://'))ip='ws://'+ip;" +
-        "  setStatus('Connecting...','connecting');" +
-        "  setBtn('Connecting...','btn-connecting');" +
+        "  setStatus('Connecting...','connecting');setBtn('Connecting...','btn-connecting');" +
         "  try{" +
         "    ws=new WebSocket(ip);ws.binaryType='arraybuffer';" +
         "    ws.onopen=function(){" +
         "      isConnected=true;" +
-        "      setStatus('Connected','online');" +
-        "      setBtn('Disconnect','btn-disconnect');" +
+        "      setStatus('Connected','online');setBtn('Disconnect','btn-disconnect');" +
         "      document.getElementById('connectCard').style.display='none';" +
         "      document.getElementById('infoCard').style.display='none';" +
         "      var sc=document.getElementById('screen');sc.classList.add('active');sc.style.display='flex';sc.style.flexDirection='column';sc.style.flex='1';" +
-        "      document.getElementById('menuBtn').style.display='block';" +
         "    };" +
         "    ws.onmessage=function(e){" +
         "      if(e.data instanceof ArrayBuffer){" +
         "        var blob=new Blob([e.data],{type:'image/jpeg'});" +
         "        var url=URL.createObjectURL(blob);" +
         "        var img=document.getElementById('screenImg');" +
-        "        if(img.src)URL.revokeObjectURL(img.src);" +
-        "        img.src=url;" +
+        "        if(img.src)URL.revokeObjectURL(img.src);img.src=url;" +
         "      }" +
         "    };" +
         "    ws.onclose=function(){backToHome();};" +
         "    ws.onerror=function(){setStatus('Error','offline');backToHome();};" +
         "  }catch(e){setStatus('Error','offline');backToHome();}" +
         "}" +
-        "" +
-        "function disconnect(){" +
-        "  if(ws){ws.close();ws=null;}" +
-        "  backToHome();" +
-        "}" +
-        "" +
+        "function disconnect(){if(ws){ws.close();ws=null;}backToHome();}" +
         "function backToHome(){" +
-        "  isConnected=false;" +
-        "  setStatus('Offline','offline');" +
-        "  setBtn('Connect','btn-connect');" +
+        "  isConnected=false;setStatus('Offline','offline');setBtn('Connect','btn-connect');" +
         "  document.getElementById('connectCard').style.display='block';" +
         "  document.getElementById('infoCard').style.display='block';" +
-        "  document.getElementById('screen').style.display='none';" +
-        "  document.getElementById('screen').classList.remove('active');" +
-        "  document.getElementById('menuBtn').style.display='none';" +
+        "  document.getElementById('screen').style.display='none';document.getElementById('screen').classList.remove('active');" +
         "  document.getElementById('keyboard').classList.remove('active');" +
         "}" +
-        "" +
-        "function setBtn(text,cls){" +
-        "  var b=document.getElementById('toggleBtn');" +
-        "  b.textContent=text;b.className=cls;" +
-        "}" +
+        "function setBtn(t,c){var b=document.getElementById('toggleBtn');b.textContent=t;b.className=c;}" +
         "function setStatus(t,c){document.getElementById('status').textContent=t;document.getElementById('status').className=c;}" +
-        "" +
-        "function openMenu(){document.getElementById('homeMenu').classList.add('active');}" +
-        "function closeMenu(){document.getElementById('homeMenu').classList.remove('active');}" +
-        "function showAbout(){closeMenu();document.getElementById('aboutPage').classList.add('active');}" +
-        "function hideAbout(){document.getElementById('aboutPage').classList.remove('active');}" +
-        "function showTutorial(){closeMenu();document.getElementById('tutorialPage').classList.add('active');}" +
-        "function hideTutorial(){document.getElementById('tutorialPage').classList.remove('active');}" +
-        "" +
-        "function sendTouchToServer(type,x,y){" +
-        "  if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:type,x:x,y:y}));" +
-        "}" +
-        "function sendKey(e,key){" +
-        "  e.preventDefault();e.stopPropagation();" +
-        "  if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:'key',key:key}));" +
-        "}" +
-        "function toggleKeyboard(){" +
-        "  var kb=document.getElementById('keyboard');" +
-        "  if(kb.classList.contains('active')){kb.classList.remove('active');document.getElementById('touchHint').style.display='block';}" +
-        "  else{kb.classList.add('active');document.getElementById('touchHint').style.display='none';}" +
-        "}" +
+
+        /* Touch & Keyboard */
+        "function sendTouchToServer(type,x,y){if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:type,x:x,y:y}));}" +
+        "function sendKey(e,key){e.preventDefault();e.stopPropagation();if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:'key',key:key}));}" +
+        "function toggleKeyboard(){var kb=document.getElementById('keyboard');if(kb.classList.contains('active')){kb.classList.remove('active');document.getElementById('touchHint').style.display='block';}else{kb.classList.add('active');document.getElementById('touchHint').style.display='none';}}" +
         "</script></body></html>";
     }
     
