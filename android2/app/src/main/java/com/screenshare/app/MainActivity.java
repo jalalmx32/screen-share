@@ -5,7 +5,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.MotionEvent;
-import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
@@ -16,8 +15,6 @@ public class MainActivity extends Activity {
     
     private WebView webView;
     private Handler mainHandler;
-    private float lastX = 0;
-    private float lastY = 0;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,14 +27,12 @@ public class MainActivity extends Activity {
         );
         
         mainHandler = new Handler(Looper.getMainLooper());
-        
         webView = new WebView(this);
         setContentView(webView);
         
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
-        settings.setAllowFileAccess(true);
         
         webView.setWebViewClient(new WebViewClient());
         webView.setBackgroundColor(0xFF0D1117);
@@ -49,31 +44,23 @@ public class MainActivity extends Activity {
     public boolean dispatchTouchEvent(MotionEvent event) {
         float x = event.getX();
         float y = event.getY();
-        float viewWidth = webView.getWidth();
-        float viewHeight = webView.getHeight();
+        float vw = webView.getWidth();
+        float vh = webView.getHeight();
         
-        float normalizedX = Math.max(0, Math.min(1, x / viewWidth));
-        float normalizedY = Math.max(0, Math.min(1, y / viewHeight));
+        float nx = Math.max(0, Math.min(1, x / vw));
+        float ny = Math.max(0, Math.min(1, y / vh));
         
         String type = "";
         switch (event.getAction()) {
-            case MotionEvent.ACTION_DOWN:
-                type = "touch_start";
-                break;
-            case MotionEvent.ACTION_MOVE:
-                type = "touch_move";
-                break;
-            case MotionEvent.ACTION_UP:
-                type = "touch_end";
-                break;
+            case MotionEvent.ACTION_DOWN: type = "touch_start"; break;
+            case MotionEvent.ACTION_MOVE: type = "touch_move"; break;
+            case MotionEvent.ACTION_UP: type = "touch_end"; break;
         }
         
         if (!type.isEmpty()) {
-            final String js = "sendTouchToServer('" + type + "', " + normalizedX + ", " + normalizedY + ")";
+            final String js = "sendTouchToServer('" + type + "'," + nx + "," + ny + ")";
             mainHandler.post(() -> {
-                try {
-                    webView.evaluateJavascript(js, null);
-                } catch (Exception e) {}
+                try { webView.evaluateJavascript(js, null); } catch (Exception e) {}
             });
         }
         
@@ -81,107 +68,161 @@ public class MainActivity extends Activity {
     }
     
     private String getHTML() {
-        return "<!DOCTYPE html>\n" +
-        "<html>\n" +
-        "<head>\n" +
-        "<meta name='viewport' content='width=device-width, initial-scale=1.0, user-scalable=no'>\n" +
-        "<style>\n" +
-        "* { margin:0; padding:0; box-sizing:border-box; }\n" +
-        "body { background:#0D1117; color:#e0e0e0; font-family:-apple-system,sans-serif; min-height:100vh; display:flex; flex-direction:column; padding:16px; }\n" +
-        ".header { text-align:center; margin-bottom:20px; }\n" +
-        "h1 { color:#00D4FF; font-size:22px; }\n" +
-        ".sub { color:#888; font-size:11px; }\n" +
-        ".author { color:#00D4FF; font-size:12px; margin-top:4px; }\n" +
-        ".card { background:#161B22; border:1px solid #1a508b; border-radius:10px; padding:14px; margin-bottom:12px; }\n" +
-        "input { width:100%; padding:12px; background:#0f3460; border:1px solid #1a508b; border-radius:8px; color:white; font-size:15px; margin-bottom:10px; }\n" +
-        "input:focus { outline:none; border-color:#00D4FF; }\n" +
-        "button { width:100%; padding:12px; border:none; border-radius:8px; font-size:15px; font-weight:bold; }\n" +
-        "#connectBtn { background:#00D4FF; color:#0D1117; }\n" +
-        "#disconnectBtn { background:#F87171; color:white; display:none; }\n" +
-        "#status { text-align:center; font-size:13px; margin:12px 0; }\n" +
-        ".online { color:#4ADE80; } .offline { color:#F87171; } .connecting { color:#FBBF24; }\n" +
-        "#screen { flex:1; background:black; border-radius:8px; display:none; min-height:250px; }\n" +
-        "#screen.active { display:flex; align-items:center; justify-content:center; }\n" +
-        "#screenImg { width:100%; height:100%; object-fit:contain; }\n" +
-        ".touch-hint { text-align:center; color:#4ADE80; font-size:11px; display:none; }\n" +
-        ".touch-hint.active { display:block; }\n" +
-        ".info { font-size:11px; color:#888; line-height:1.5; }\n" +
-        ".info b { color:#00D4FF; }\n" +
-        "</style>\n" +
-        "</head>\n" +
-        "<body>\n" +
-        "<div class='header'>\n" +
-        "  <h1>ScreenShare</h1>\n" +
-        "  <div class='sub'>Wireless Display + Touch Control</div>\n" +
-        "  <div class='author'>by Jalal | <a href='https://t.me/x16_96' style='color:#00D4FF;text-decoration:none;'>@x16_96</a></div>\n" +
-        "</div>\n" +
-        "<div class='card' id='connectCard'>\n" +
-        "  <input type='text' id='ipInput' placeholder='PC IP: 192.168.43.1:8765'>\n" +
-        "  <button id='connectBtn' onclick='connect()'>Connect</button>\n" +
-        "  <button id='disconnectBtn' onclick='disconnect()'>Disconnect</button>\n" +
-        "</div>\n" +
-        "<div id='status' class='offline'>Offline</div>\n" +
-        "<div id='screen'><img id='screenImg'></div>\n" +
-        "<div id='touchHint' class='touch-hint'>Touch screen to control PC</div>\n" +
-        "<div class='card' id='infoCard'>\n" +
-        "  <div class='info'>\n" +
-        "    <b>1.</b> Enable hotspot on Android<br>\n" +
-        "    <b>2.</b> Connect PC to hotspot<br>\n" +
-        "    <b>3.</b> Start ScreenShare on PC<br>\n" +
-        "    <b>4.</b> Enter IP from PC screen<br>\n" +
-        "    <b>5.</b> Touch to control PC!\n" +
-        "  </div>\n" +
-        "</div>\n" +
-        "<script>\n" +
-        "var ws = null;\n" +
-        "function connect() {\n" +
-        "  var ip = document.getElementById('ipInput').value.trim();\n" +
-        "  if (!ip) { alert('Enter IP'); return; }\n" +
-        "  if (!ip.startsWith('ws://')) ip = 'ws://' + ip;\n" +
-        "  setStatus('Connecting...', 'connecting');\n" +
-        "  document.getElementById('connectBtn').style.display = 'none';\n" +
-        "  try {\n" +
-        "    ws = new WebSocket(ip);\n" +
-        "    ws.binaryType = 'arraybuffer';\n" +
-        "    ws.onopen = function() {\n" +
-        "      setStatus('Connected - Touch enabled', 'online');\n" +
-        "      document.getElementById('disconnectBtn').style.display = 'block';\n" +
-        "      document.getElementById('screen').classList.add('active');\n" +
-        "      document.getElementById('touchHint').classList.add('active');\n" +
-        "      document.getElementById('connectCard').style.display = 'none';\n" +
-        "      document.getElementById('infoCard').style.display = 'none';\n" +
-        "    };\n" +
-        "    ws.onmessage = function(e) {\n" +
-        "      if (e.data instanceof ArrayBuffer) {\n" +
-        "        var blob = new Blob([e.data], {type:'image/jpeg'});\n" +
-        "        var url = URL.createObjectURL(blob);\n" +
-        "        var img = document.getElementById('screenImg');\n" +
-        "        if (img.src) URL.revokeObjectURL(img.src);\n" +
-        "        img.src = url;\n" +
-        "      }\n" +
-        "    };\n" +
-        "    ws.onclose = function() { setStatus('Disconnected', 'offline'); resetUI(); };\n" +
-        "    ws.onerror = function() { setStatus('Error', 'offline'); resetUI(); };\n" +
-        "  } catch(e) { setStatus('Error', 'offline'); resetUI(); }\n" +
-        "}\n" +
-        "function disconnect() { if(ws){ws.close();ws=null;} resetUI(); setStatus('Offline', 'offline'); }\n" +
-        "function setStatus(t,c) { var s=document.getElementById('status'); s.textContent=t; s.className=c; }\n" +
-        "function resetUI() {\n" +
-        "  document.getElementById('connectBtn').style.display='block';\n" +
-        "  document.getElementById('disconnectBtn').style.display='none';\n" +
-        "  document.getElementById('screen').classList.remove('active');\n" +
-        "  document.getElementById('touchHint').classList.remove('active');\n" +
-        "  document.getElementById('connectCard').style.display='block';\n" +
-        "  document.getElementById('infoCard').style.display='block';\n" +
-        "}\n" +
-        "function sendTouchToServer(type, x, y) {\n" +
-        "  if (ws && ws.readyState === WebSocket.OPEN) {\n" +
-        "    ws.send(JSON.stringify({type:type, x:x, y:y}));\n" +
-        "  }\n" +
-        "}\n" +
-        "</script>\n" +
-        "</body>\n" +
-        "</html>";
+        return "<!DOCTYPE html><html><head>" +
+        "<meta name='viewport' content='width=device-width,initial-scale=1,user-scalable=no'>" +
+        "<style>" +
+        "*{margin:0;padding:0;box-sizing:border-box;}" +
+        "body{background:#0D1117;color:#e0e0e0;font-family:-apple-system,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;}" +
+        ".header{text-align:center;padding:10px;background:#161B22;border-bottom:1px solid #1a508b;}" +
+        "h1{color:#00D4FF;font-size:18px;}" +
+        ".sub{color:#888;font-size:10px;}" +
+        ".author{color:#00D4FF;font-size:11px;margin-top:2px;}" +
+        ".author a{color:#00D4FF;text-decoration:none;}" +
+        ".card{background:#161B22;border:1px solid #1a508b;border-radius:8px;padding:12px;margin:8px;}" +
+        "input{width:100%;padding:10px;background:#0f3460;border:1px solid #1a508b;border-radius:6px;color:white;font-size:14px;margin-bottom:8px;}" +
+        "input:focus{outline:none;border-color:#00D4FF;}" +
+        "button{width:100%;padding:10px;border:none;border-radius:6px;font-size:14px;font-weight:bold;}" +
+        "#connectBtn{background:#00D4FF;color:#0D1117;}" +
+        "#disconnectBtn{background:#F87171;color:white;margin-top:6px;}" +
+        "#status{text-align:center;font-size:12px;padding:6px;}" +
+        ".online{color:#4ADE80;} .offline{color:#F87171;} .connecting{color:#FBBF24;}" +
+        "#screen{flex:1;background:#000;display:none;position:relative;overflow:hidden;}" +
+        "#screen.active{display:flex;flex-direction:column;}" +
+        "#screenImg{width:100%;flex:1;object-fit:contain;}" +
+        ".touch-hint{text-align:center;color:#4ADE80;font-size:10px;padding:4px;}" +
+        ".keyboard{background:#161B22;border-top:1px solid #1a508b;padding:6px;display:none;flex-wrap:wrap;gap:4px;justify-content:center;}" +
+        ".keyboard.active{display:flex;}" +
+        ".kbd{background:#0f3460;border:1px solid #1a508b;border-radius:4px;color:white;padding:6px 8px;font-size:11px;text-align:center;min-width:32px;}" +
+        ".kbd:active{background:#00D4FF;color:#0D1117;}" +
+        ".kbd.wide{min-width:50px;font-size:10px;}" +
+        ".kbd.special{background:#1a508b;border-color:#00D4FF;}" +
+        ".kbd.row2{min-width:28px;}" +
+        ".info{font-size:10px;color:#888;line-height:1.4;padding:0 8px 8px 8px;}" +
+        ".info b{color:#00D4FF;}" +
+        "#kbToggle{background:#1a508b;color:white;width:auto;padding:4px 10px;font-size:10px;border-radius:4px;position:absolute;right:8px;top:50%;transform:translateY(-50%);z-index:10;}" +
+        "</style></head><body>" +
+        "<div class='header'>" +
+        "  <h1>ScreenShare</h1>" +
+        "  <div class='sub'>Wireless Display + Touch + Keyboard</div>" +
+        "  <div class='author'>by Jalal | <a href='https://t.me/x16_96'>@x16_96</a></div>" +
+        "</div>" +
+        "<div class='card' id='connectCard'>" +
+        "  <input type='text' id='ipInput' placeholder='PC IP: 192.168.43.1:8765'>" +
+        "  <button id='connectBtn' onclick='connect()'>Connect</button>" +
+        "</div>" +
+        "<div id='status' class='offline'>Offline</div>" +
+        "<div id='screen'>" +
+        "  <div style='position:relative;'>" +
+        "    <button id='kbToggle' onclick='toggleKeyboard()'>Keyboard</button>" +
+        "  </div>" +
+        "  <img id='screenImg'>" +
+        "  <div id='touchHint' class='touch-hint'>Touch screen to control PC</div>" +
+        "  <div class='keyboard' id='keyboard'>" +
+        "    <div class='kbd special' ontouchstart='sendKey(event,\"win\")'>Win</div>" +
+        "    <div class='kbd special' ontouchstart='sendKey(event,\"alt\")'>Alt</div>" +
+        "    <div class='kbd special' ontouchstart='sendKey(event,\"ctrl\")'>Ctrl</div>" +
+        "    <div class='kbd special' ontouchstart='sendKey(event,\"shift\")'>Shift</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"esc\")'>Esc</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"tab\")'>Tab</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"capslock\")'>Caps</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"space\")'>Space</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"backspace\")'>BS</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"enter\")'>Enter</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"delete\")'>Del</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"insert\")'>Ins</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"home\")'>Home</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"end\")'>End</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"pageup\")'>PgUp</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"pagedown\")'>PgDn</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"up\")'>Up</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"down\")'>Down</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"left\")'>Left</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"right\")'>Right</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"f4\")'>F4</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"f5\")'>F5</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"f11\")'>F11</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"printscreen\")'>PrtSc</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"alt_tab\")'>Alt+Tab</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"alt_f4\")'>Alt+F4</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"ctrl_c\")'>Ctrl+C</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"ctrl_v\")'>Ctrl+V</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"ctrl_z\")'>Ctrl+Z</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"ctrl_a\")'>Ctrl+A</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"ctrl_s\")'>Ctrl+S</div>" +
+        "    <div class='kbd' ontouchstart='sendKey(event,\"ctrl_x\")'>Ctrl+X</div>" +
+        "  </div>" +
+        "</div>" +
+        "<div class='card' id='infoCard'>" +
+        "  <div class='info'>" +
+        "    <b>1.</b> Enable hotspot on Android<br>" +
+        "    <b>2.</b> Connect PC to hotspot<br>" +
+        "    <b>3.</b> Start ScreenShare on PC<br>" +
+        "    <b>4.</b> Enter IP from PC screen<br>" +
+        "    <b>5.</b> Touch to control PC!" +
+        "  </div>" +
+        "</div>" +
+        "<script>" +
+        "var ws=null;var kbVisible=false;" +
+        "function connect(){" +
+        "  var ip=document.getElementById('ipInput').value.trim();" +
+        "  if(!ip){alert('Enter IP');return;}" +
+        "  if(!ip.startsWith('ws://'))ip='ws://'+ip;" +
+        "  setStatus('Connecting...','connecting');" +
+        "  document.getElementById('connectBtn').style.display='none';" +
+        "  try{" +
+        "    ws=new WebSocket(ip);ws.binaryType='arraybuffer';" +
+        "    ws.onopen=function(){" +
+        "      setStatus('Connected','online');" +
+        "      document.getElementById('connectCard').style.display='none';" +
+        "      document.getElementById('infoCard').style.display='none';" +
+        "      document.getElementById('screen').classList.add('active');" +
+        "      document.getElementById('touchHint').style.display='block';" +
+        "      document.getElementById('keyboard').classList.add('active');" +
+        "      document.getElementById('kbToggle').style.display='block';" +
+        "    };" +
+        "    ws.onmessage=function(e){" +
+        "      if(e.data instanceof ArrayBuffer){" +
+        "        var blob=new Blob([e.data],{type:'image/jpeg'});" +
+        "        var url=URL.createObjectURL(blob);" +
+        "        var img=document.getElementById('screenImg');" +
+        "        if(img.src)URL.revokeObjectURL(img.src);" +
+        "        img.src=url;" +
+        "      }" +
+        "    };" +
+        "    ws.onclose=function(){setStatus('Disconnected','offline');resetUI();};" +
+        "    ws.onerror=function(){setStatus('Error','offline');resetUI();};" +
+        "  }catch(e){setStatus('Error','offline');resetUI();}" +
+        "}" +
+        "function disconnect(){" +
+        "  if(ws){ws.close();ws=null;}" +
+        "  resetUI();setStatus('Offline','offline');" +
+        "}" +
+        "function resetUI(){" +
+        "  document.getElementById('connectCard').style.display='block';" +
+        "  document.getElementById('infoCard').style.display='block';" +
+        "  document.getElementById('screen').classList.remove('active');" +
+        "  document.getElementById('keyboard').classList.remove('active');" +
+        "  document.getElementById('kbToggle').style.display='none';" +
+        "  document.getElementById('connectBtn').style.display='block';" +
+        "}" +
+        "function setStatus(t,c){document.getElementById('status').textContent=t;document.getElementById('status').className=c;}" +
+        "function sendTouchToServer(type,x,y){" +
+        "  if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:type,x:x,y:y}));" +
+        "}" +
+        "function sendKey(e,key){" +
+        "  e.preventDefault();e.stopPropagation();" +
+        "  if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:'key',key:key}));" +
+        "}" +
+        "function toggleKeyboard(){" +
+        "  var kb=document.getElementById('keyboard');" +
+        "  kbVisible=!kbVisible;" +
+        "  kb.style.display=kbVisible?'flex':'none';" +
+        "  document.getElementById('touchHint').style.display=kbVisible?'none':'block';" +
+        "}" +
+        "function toggleDisconnect(){" +
+        "  if(confirm('Disconnect?'))disconnect();" +
+        "}" +
+        "</script></body></html>";
     }
     
     @Override

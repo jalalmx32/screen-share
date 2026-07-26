@@ -1,6 +1,6 @@
 """
 WebSocket Server Module
-Handles client connections, streams screen frames, and receives touch input
+Handles client connections, streams screen frames, and receives touch + keyboard input
 """
 
 import asyncio
@@ -17,6 +17,47 @@ except ImportError:
     HAS_WEBSOCKETS = False
 
 
+# Key mapping for special keys
+KEY_MAP = {
+    "win": "win",
+    "alt": "altleft",
+    "ctrl": "ctrlleft",
+    "shift": "shiftleft",
+    "esc": "escape",
+    "tab": "tab",
+    "capslock": "capslock",
+    "space": "space",
+    "backspace": "backspace",
+    "enter": "enter",
+    "delete": "delete",
+    "insert": "insert",
+    "home": "home",
+    "end": "end",
+    "pageup": "pageup",
+    "pagedown": "pagedown",
+    "up": "up",
+    "down": "down",
+    "left": "left",
+    "right": "right",
+    "f4": "f4",
+    "f5": "f5",
+    "f11": "f11",
+    "printscreen": "printscreen",
+}
+
+# Combo key mappings
+COMBO_MAP = {
+    "alt_tab": ["altleft", "tab"],
+    "alt_f4": ["altleft", "f4"],
+    "ctrl_c": ["ctrlleft", "c"],
+    "ctrl_v": ["ctrlleft", "v"],
+    "ctrl_z": ["ctrlleft", "z"],
+    "ctrl_a": ["ctrlleft", "a"],
+    "ctrl_s": ["ctrlleft", "s"],
+    "ctrl_x": ["ctrlleft", "x"],
+}
+
+
 class WebSocketServer:
     """WebSocket server for streaming screen to Android clients"""
     
@@ -31,7 +72,6 @@ class WebSocketServer:
         self.thread = None
         self.loop = None
         
-        # Screen dimensions for touch mapping
         self.screen_width = 1920
         self.screen_height = 1080
         
@@ -40,11 +80,9 @@ class WebSocketServer:
         pyautogui.PAUSE = 0.01
     
     def start(self):
-        """Start the WebSocket server"""
         if not HAS_WEBSOCKETS:
             raise RuntimeError("websockets library not installed. Run: pip install websockets")
         
-        # Get actual screen size
         try:
             self.screen_width, self.screen_height = pyautogui.size()
         except Exception:
@@ -55,7 +93,6 @@ class WebSocketServer:
         self.thread.start()
     
     def stop(self):
-        """Stop the WebSocket server"""
         self.running = False
         if self.loop:
             self.loop.call_soon_threadsafe(self.loop.stop)
@@ -64,33 +101,28 @@ class WebSocketServer:
         self.clients.clear()
     
     def _run_server(self):
-        """Run the server in a separate thread"""
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-        
         self.loop.run_until_complete(self._serve())
     
     async def _serve(self):
-        """Main server coroutine"""
         async with websockets.serve(
             self._handle_client,
             self.host,
             self.port,
             ping_interval=20,
             ping_timeout=10,
-            max_size=2**20,  # 1MB max message size
+            max_size=2**20,
             compression=None
         ) as server:
             self.server = server
             if self.signals:
                 self.signals.status_update.emit(f"Server started on {self.host}:{self.port}")
             
-            # Keep running until stopped
             while self.running:
                 await asyncio.sleep(1)
     
     async def _handle_client(self, websocket, path=None):
-        """Handle a new client connection"""
         client_id = str(uuid.uuid4())[:8]
         client_addr = websocket.remote_address
         
@@ -104,7 +136,6 @@ class WebSocketServer:
             self.signals.client_connected.emit(f"{client_addr[0]}:{client_addr[1]}")
         
         try:
-            # Send welcome message with screen dimensions
             welcome = {
                 "type": "welcome",
                 "client_id": client_id,
@@ -114,7 +145,6 @@ class WebSocketServer:
             }
             await websocket.send(json.dumps(welcome))
             
-            # Handle messages from client (touch events)
             await self._handle_messages(websocket, client_id)
             
         except websockets.exceptions.ConnectionClosed:
@@ -122,7 +152,6 @@ class WebSocketServer:
         except Exception as e:
             print(f"Client error: {e}")
         finally:
-            # Remove client
             if client_id in self.clients:
                 del self.clients[client_id]
             
@@ -131,17 +160,20 @@ class WebSocketServer:
                 self.signals.client_disconnected.emit(f"{addr[0]}:{addr[1]}")
     
     async def _handle_messages(self, websocket, client_id):
-        """Handle incoming messages from client (touch events)"""
-        # Start streaming frames
         frame_task = asyncio.create_task(self._stream_frames(websocket, client_id))
         
         try:
             async for message in websocket:
-                # Handle touch events
                 if isinstance(message, str):
                     try:
                         data = json.loads(message)
-                        self._process_touch_event(data)
+                        msg_type = data.get("type", "")
+                        
+                        if msg_type in ("touch_start", "touch_move", "touch_end", 
+                                         "double_tap", "long_press"):
+                            self._process_touch_event(data)
+                        elif msg_type == "key":
+                            self._process_key_event(data)
                     except json.JSONDecodeError:
                         pass
         except websockets.exceptions.ConnectionClosed:
@@ -156,36 +188,45 @@ class WebSocketServer:
             x = data.get("x", 0)
             y = data.get("y", 0)
             
-            # Convert normalized coordinates (0-1) to screen coordinates
             screen_x = int(x * self.screen_width)
             screen_y = int(y * self.screen_height)
             
             if event_type == "touch_start":
-                # Move mouse and click
                 pyautogui.moveTo(screen_x, screen_y, duration=0.05)
                 pyautogui.mouseDown()
-                
             elif event_type == "touch_move":
-                # Move mouse
                 pyautogui.moveTo(screen_x, screen_y, duration=0.02)
-                
             elif event_type == "touch_end":
-                # Release click
                 pyautogui.mouseUp()
-                
             elif event_type == "double_tap":
-                # Double click
                 pyautogui.doubleClick(screen_x, screen_y)
-                
             elif event_type == "long_press":
-                # Right click
                 pyautogui.rightClick(screen_x, screen_y)
                 
         except Exception as e:
             print(f"Touch error: {e}")
     
+    def _process_key_event(self, data):
+        """Process keyboard event from Android client"""
+        try:
+            key = data.get("key", "")
+            
+            # Check for combo keys first
+            if key in COMBO_MAP:
+                combo = COMBO_MAP[key]
+                # Press all keys in sequence
+                for k in combo:
+                    pyautogui.keyDown(k)
+                # Release in reverse order
+                for k in reversed(combo):
+                    pyautogui.keyUp(k)
+            elif key in KEY_MAP:
+                pyautogui.press(KEY_MAP[key])
+                
+        except Exception as e:
+            print(f"Key error: {e}")
+    
     async def _stream_frames(self, websocket, client_id):
-        """Stream screen frames to client"""
         frame_count = 0
         
         while self.running and client_id in self.clients:
@@ -193,11 +234,9 @@ class WebSocketServer:
                 frame = self.screen_capture.get_frame()
                 
                 if frame:
-                    # Send frame as binary
                     await websocket.send(frame)
                     frame_count += 1
                     
-                    # Send stats every 30 frames
                     if frame_count % 30 == 0:
                         stats = {
                             "type": "stats",
@@ -206,7 +245,6 @@ class WebSocketServer:
                         }
                         await websocket.send(json.dumps(stats))
                 
-                # Maintain frame rate
                 await asyncio.sleep(1.0 / self.screen_capture.fps)
                 
             except websockets.exceptions.ConnectionClosed:
@@ -216,11 +254,9 @@ class WebSocketServer:
                 break
     
     def get_client_count(self):
-        """Get number of connected clients"""
         return len(self.clients)
     
     def get_clients(self):
-        """Get list of connected clients"""
         return [
             {
                 "id": cid,
