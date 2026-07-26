@@ -70,8 +70,8 @@ class ScreenCapture:
                     # Capture screen
                     screenshot = sct.grab(monitor)
                     
-                    # Convert to PIL Image - use raw bytes (BGRA format)
-                    img = Image.frombytes("RGB", screenshot.size, bytes(screenshot), "raw", "BGRX")
+                    # Convert to PIL Image using RGB bytes
+                    img = Image.frombytes("RGB", screenshot.size, screenshot.rgb)
                     
                     # Resize to target resolution
                     img = img.resize(self.resolution, Image.Resampling.LANCZOS)
