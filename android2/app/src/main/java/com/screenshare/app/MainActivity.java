@@ -554,17 +554,22 @@ public class MainActivity extends Activity {
         "        saveHistory(ip);dbg('Screen view shown');" +
         "      };" +
         "      ws.onmessage=function(e){" +
+        "        dbg('MSG type: '+typeof e.data+' is ArrayBuffer: '+(e.data instanceof ArrayBuffer));" +
         "        if(e.data instanceof ArrayBuffer){" +
+        "          dbg('Got ArrayBuffer, size: '+e.data.byteLength);" +
         "          var b=new Blob([e.data],{type:'image/jpeg'});" +
         "          var u=URL.createObjectURL(b);" +
-        "          if(img.src)URL.revokeObjectURL(img.src);img.src=u;" +
+        "          if(img.src)URL.revokeObjectURL(img.src);" +
+        "          img.src=u;" +
+        "          dbg('Image updated!');" +
+        "        }else if(typeof e.data === 'string'){" +
+        "          dbg('TEXT: '+e.data.substring(0,100));" +
         "        }else{" +
-        "          dbg('MSG: '+e.data);" +
+        "          dbg('OTHER: '+typeof e.data);" +
         "        }" +
         "      };" +
         "      ws.onclose=function(e){" +
-        "        dbg('WebSocket CLOSED: '+e.code);" +
-        "        goHome();" +
+        "        dbg('WebSocket CLOSED: '+e.code);goHome();" +
         "      };" +
         "      ws.onerror=function(e){" +
         "        dbg('WebSocket ERROR!');goHome();" +
