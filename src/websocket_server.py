@@ -61,6 +61,14 @@ class WebSocketServer:
     def start(self):
         if not HAS_WEBSOCKETS:
             raise RuntimeError("websockets library not installed. Run: pip install websockets")
+
+        # Check if port is already in use before starting
+        if self._is_port_in_use():
+            raise RuntimeError(
+                f"Port {self.port} is already in use. "
+                "Another instance may be running, or the port hasn't been released yet."
+            )
+
         try:
             self.screen_width, self.screen_height = pyautogui.size()
         except Exception:
@@ -71,13 +79,35 @@ class WebSocketServer:
         self.udp_thread = threading.Thread(target=self._run_udp_discovery, daemon=True)
         self.udp_thread.start()
 
+    def _is_port_in_use(self):
+        """Check if the port is already in use"""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
+                s.bind((self.host, self.port))
+                return False
+        except OSError:
+            return True
+
     def stop(self):
         self.running = False
-        if self.loop:
-            self.loop.call_soon_threadsafe(self.loop.stop)
+        if self.loop and self.loop.is_running():
+            # Schedule server close and loop stop
+            self.loop.call_soon_threadsafe(self._close_server_and_stop)
         if self.thread:
-            self.thread.join(timeout=3)
+            self.thread.join(timeout=5)
         self.clients.clear()
+
+    def _close_server_and_stop(self):
+        """Close the WebSocket server gracefully, then stop the loop"""
+        if self.server:
+            try:
+                self.server.close()
+                # Schedule wait_closed on the loop
+                self.loop.create_task(self.server.wait_closed())
+            except Exception:
+                pass
+        self.loop.stop()
 
     def _run_udp_discovery(self):
         """Listen for UDP discovery packets from Android"""
@@ -86,7 +116,7 @@ class WebSocketServer:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.bind(("", 8766))
             sock.settimeout(1)
-            
+
             while self.running:
                 try:
                     data, addr = sock.recvfrom(1024)
@@ -102,7 +132,8 @@ class WebSocketServer:
                 except socket.timeout:
                     continue
                 except Exception as e:
-                    print(f"UDP error: {e}")
+                    if self.running:
+                        print(f"UDP error: {e}")
             sock.close()
         except Exception as e:
             print(f"UDP discovery failed: {e}")
@@ -110,20 +141,38 @@ class WebSocketServer:
     def _run_server(self):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-        self.loop.run_until_complete(self._serve())
+        try:
+            self.loop.run_until_complete(self._serve())
+        except Exception as e:
+            if self.running:
+                print(f"Server error: {e}")
+        finally:
+            try:
+                self.loop.close()
+            except Exception:
+                pass
 
     async def _serve(self):
-        async with websockets.serve(
-            self._handle_client, self.host, self.port,
-            ping_interval=20, ping_timeout=10, max_size=2**22, compression=None
-        ) as server:
-            self.server = server
+        try:
+            async with websockets.serve(
+                self._handle_client, self.host, self.port,
+                ping_interval=20, ping_timeout=10, max_size=2**22, compression=None
+            ) as server:
+                self.server = server
+                if self.signals:
+                    self.signals.status_update.emit(f"Server on {self.host}:{self.port}")
+                while self.running:
+                    await asyncio.sleep(1)
+        except OSError as e:
             if self.signals:
-                self.signals.status_update.emit(f"Server on {self.host}:{self.port}")
-            while self.running:
-                await asyncio.sleep(1)
+                self.signals.error_occurred.emit(f"Server bind error: {e}")
+            print(f"Server bind error: {e}")
+        except Exception as e:
+            if self.signals:
+                self.signals.error_occurred.emit(f"Server error: {e}")
+            print(f"Server error: {e}")
 
-    async def _handle_client(self, websocket, path=None):
+    async def _handle_client(self, websocket):
         client_id = str(uuid.uuid4())[:8]
         client_addr = websocket.remote_address
         self.clients[client_id] = {"websocket": websocket, "address": client_addr, "connected_at": time.time()}
@@ -133,10 +182,15 @@ class WebSocketServer:
             self.signals.client_connected.emit(f"{client_addr[0]}:{client_addr[1]}")
 
         try:
+            # Determine resolution and fps from screen_capture, with safe defaults
+            sc = self.screen_capture
+            resolution = sc.resolution if sc else (1280, 720)
+            fps = sc.fps if sc else 30
+
             welcome = {
                 "type": "welcome", "client_id": client_id,
-                "resolution": self.screen_capture.resolution if self.screen_capture else (1280, 720),
-                "fps": self.screen_capture.fps if self.screen_capture else 30,
+                "resolution": resolution,
+                "fps": fps,
                 "screen_size": [self.screen_width, self.screen_height],
                 "requires_auth": bool(self.password)
             }
@@ -274,7 +328,12 @@ class WebSocketServer:
         print(f"[STREAM] Starting frame stream for client {client_id}")
         while self.running and client_id in self.clients:
             try:
-                frame = self.screen_capture.get_frame()
+                sc = self.screen_capture
+                if sc is None:
+                    await asyncio.sleep(0.5)
+                    continue
+
+                frame = sc.get_frame()
                 if frame:
                     await websocket.send(frame)
                     frame_count += 1
@@ -283,9 +342,11 @@ class WebSocketServer:
                 else:
                     if frame_count == 0:
                         print("[STREAM] No frames available yet, waiting...")
-                await asyncio.sleep(1.0 / self.screen_capture.fps)
+                await asyncio.sleep(1.0 / sc.fps)
             except websockets.exceptions.ConnectionClosed:
                 print(f"[STREAM] Client {client_id} disconnected")
+                break
+            except asyncio.CancelledError:
                 break
             except Exception as e:
                 print(f"[STREAM] Error: {e}")

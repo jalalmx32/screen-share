@@ -620,20 +620,28 @@ class MainWindow(QMainWindow):
             )
             
             self.ws_server.start()
+
+            # Wait briefly for server thread to be ready before starting capture
+            time.sleep(0.1)
+
             self.screen_capture.start()
-            
+
             self.is_running = True
             self.update_ui_state()
-            
+
             self.status_bar.showMessage("Screen sharing started!", 3000)
-            
+
+        except RuntimeError as e:
+            # Port conflict or other startup error
+            self.signals.error_occurred.emit(str(e))
         except Exception as e:
             self.signals.error_occurred.emit(str(e))
     
     def auto_start_sharing(self):
-        """Auto-start sharing on launch"""
-        # Wait a moment for GUI to load, then start
-        QTimer.singleShot(1000, self.start_sharing)
+        """Auto-start sharing on launch if the checkbox is checked"""
+        if self.auto_start_cb.isChecked():
+            # Wait a moment for GUI to load, then start
+            QTimer.singleShot(1000, self.start_sharing)
     
     def stop_sharing(self):
         """Stop screen sharing"""
