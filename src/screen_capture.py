@@ -107,6 +107,8 @@ class ScreenCapture:
     def get_frame(self):
         """Get current frame as JPEG bytes"""
         with self.frame_lock:
+            if self.current_frame is None:
+                return None
             return self.current_frame
     
     def get_fps(self):
@@ -116,6 +118,10 @@ class ScreenCapture:
     def set_resolution(self, resolution):
         """Update target resolution"""
         self.resolution = resolution
+    
+    def is_running(self):
+        """Check if capture is running"""
+        return self.running and self.capture_thread is not None and self.capture_thread.is_alive()
     
     def set_fps(self, fps):
         """Update target FPS"""

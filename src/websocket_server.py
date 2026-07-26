@@ -271,17 +271,26 @@ class WebSocketServer:
 
     async def _stream_frames(self, websocket, client_id):
         frame_count = 0
+        print(f"[STREAM] Starting frame stream for client {client_id}")
         while self.running and client_id in self.clients:
             try:
                 frame = self.screen_capture.get_frame()
                 if frame:
                     await websocket.send(frame)
                     frame_count += 1
+                    if frame_count % 30 == 0:
+                        print(f"[STREAM] Sent {frame_count} frames to {client_id}")
+                else:
+                    if frame_count == 0:
+                        print("[STREAM] No frames available yet, waiting...")
                 await asyncio.sleep(1.0 / self.screen_capture.fps)
             except websockets.exceptions.ConnectionClosed:
+                print(f"[STREAM] Client {client_id} disconnected")
                 break
             except Exception as e:
+                print(f"[STREAM] Error: {e}")
                 break
+        print(f"[STREAM] Stopped. Sent {frame_count} frames total.")
 
     def get_client_count(self):
         return len(self.clients)
