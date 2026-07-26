@@ -223,8 +223,8 @@ public class MainActivity extends Activity {
 
         /* SCREEN */
         "#screenView{display:none;flex:1;flex-direction:column;overflow:hidden;position:relative;background:#000;}" +
-        "#screenContainer{flex:1;overflow:hidden;position:relative;touch-action:none;}" +
-        "#screenImg{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;touch-action:none;user-select:none;-webkit-user-drag:none;max-width:none;}" +
+        "#screenContainer{flex:1;overflow:hidden;position:relative;touch-action:none;width:100%;height:100%;}" +
+        "#screenImg{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;transform-origin:0 0;will-change:transform;touch-action:none;user-select:none;-webkit-user-drag:none;max-width:none;background:#000;}" +
 
         /* CONTROLS BAR */
         ".controls-bar{background:#161B22;border-top:1px solid #1a508b;padding:4px 6px;display:none;flex-wrap:wrap;gap:3px;justify-content:center;flex-shrink:0;}" +
