@@ -142,38 +142,48 @@ class WebSocketServer:
             }
             await websocket.send(json.dumps(welcome))
 
-            async for message in websocket:
-                if isinstance(message, str):
-                    try:
-                        data = json.loads(message)
-                        msg_type = data.get("type", "")
+            # Start streaming frames in background
+            stream_task = asyncio.ensure_future(self._stream_frames(websocket, client_id))
 
-                        if msg_type == "auth":
-                            if data.get("password") == self.password:
-                                authenticated = True
-                                await websocket.send(json.dumps({"type": "auth_ok"}))
-                            else:
+            try:
+                async for message in websocket:
+                    if isinstance(message, str):
+                        try:
+                            data = json.loads(message)
+                            msg_type = data.get("type", "")
+
+                            if msg_type == "auth":
+                                if data.get("password") == self.password:
+                                    authenticated = True
+                                    await websocket.send(json.dumps({"type": "auth_ok"}))
+                                else:
+                                    await websocket.send(json.dumps({"type": "auth_fail"}))
+                                continue
+
+                            if not authenticated:
                                 await websocket.send(json.dumps({"type": "auth_fail"}))
-                            continue
+                                continue
 
-                        if not authenticated:
-                            await websocket.send(json.dumps({"type": "auth_fail"}))
-                            continue
-
-                        if msg_type in ("touch_start", "touch_move", "touch_end", "double_tap", "long_press"):
-                            self._process_touch(data)
-                        elif msg_type == "key":
-                            self._process_key(data)
-                        elif msg_type == "char":
-                            self._process_char(data)
-                        elif msg_type == "clipboard":
-                            self._process_clipboard(data)
-                        elif msg_type == "get_clipboard":
-                            await self._send_clipboard(websocket)
-                        elif msg_type == "list_files":
-                            await self._send_file_list(websocket)
-                    except json.JSONDecodeError:
-                        pass
+                            if msg_type in ("touch_start", "touch_move", "touch_end", "double_tap", "long_press"):
+                                self._process_touch(data)
+                            elif msg_type == "key":
+                                self._process_key(data)
+                            elif msg_type == "char":
+                                self._process_char(data)
+                            elif msg_type == "clipboard":
+                                self._process_clipboard(data)
+                            elif msg_type == "get_clipboard":
+                                await self._send_clipboard(websocket)
+                            elif msg_type == "list_files":
+                                await self._send_file_list(websocket)
+                        except json.JSONDecodeError:
+                            pass
+            finally:
+                stream_task.cancel()
+                try:
+                    await stream_task
+                except asyncio.CancelledError:
+                    pass
         except websockets.exceptions.ConnectionClosed:
             pass
         except Exception as e:
