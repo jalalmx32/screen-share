@@ -9,10 +9,10 @@ android {
 
     defaultConfig {
         applicationId "com.screenshare.app"
-        minSdk 24
+        minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.2.1"
     }
 
     buildTypes {
@@ -32,8 +32,6 @@ android {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${rootProject.ext.kotlin_version}"
-    implementation 'androidx.core:core-ktx:1.12.0'
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.10.0'
+    implementation 'androidx.core:core:1.12.0'
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
 }
