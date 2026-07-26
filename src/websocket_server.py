@@ -1,6 +1,6 @@
 """
 WebSocket Server Module
-Full-featured: screen streaming, touch, keyboard, clipboard, files, auth
+Full-featured: screen streaming, touch, keyboard, clipboard, files, auth, UDP discovery
 """
 
 import asyncio
@@ -9,6 +9,7 @@ import time
 import json
 import uuid
 import os
+import socket
 import pyautogui
 
 try:
@@ -33,11 +34,8 @@ COMBO_MAP = {
     "ctrl_z": ["ctrlleft", "z"], "ctrl_a": ["ctrlleft", "a"],
     "ctrl_s": ["ctrlleft", "s"], "ctrl_x": ["ctrlleft", "x"],
     "ctrl_y": ["ctrlleft", "y"], "ctrl_p": ["ctrlleft", "p"],
-    "ctrl_n": ["ctrlleft", "n"], "ctrl_w": ["ctrlleft", "w"],
-    "alt_f4": ["altleft", "f4"], "alt_enter": ["altleft", "enter"],
 }
 
-# Desktop path for file browsing
 DESKTOP_PATH = os.path.join(os.path.expanduser("~"), "Desktop")
 
 
@@ -54,7 +52,8 @@ class WebSocketServer:
         self.loop = None
         self.screen_width = 1920
         self.screen_height = 1080
-        self.password = None  # No password by default
+        self.password = None
+        self.udp_thread = None
 
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = 0.01
@@ -69,6 +68,8 @@ class WebSocketServer:
         self.running = True
         self.thread = threading.Thread(target=self._run_server, daemon=True)
         self.thread.start()
+        self.udp_thread = threading.Thread(target=self._run_udp_discovery, daemon=True)
+        self.udp_thread.start()
 
     def stop(self):
         self.running = False
@@ -77,6 +78,34 @@ class WebSocketServer:
         if self.thread:
             self.thread.join(timeout=3)
         self.clients.clear()
+
+    def _run_udp_discovery(self):
+        """Listen for UDP discovery packets from Android"""
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(("", 8766))
+            sock.settimeout(1)
+            
+            while self.running:
+                try:
+                    data, addr = sock.recvfrom(1024)
+                    msg = data.decode("utf-8")
+                    if msg == "SCREENSHARE_DISCOVER":
+                        response = json.dumps({
+                            "name": "ScreenShare",
+                            "port": self.port,
+                            "clients": self.get_client_count()
+                        })
+                        sock.sendto(response.encode("utf-8"), addr)
+                        print(f"Discovery response sent to {addr[0]}")
+                except socket.timeout:
+                    continue
+                except Exception as e:
+                    print(f"UDP error: {e}")
+            sock.close()
+        except Exception as e:
+            print(f"UDP discovery failed: {e}")
 
     def _run_server(self):
         self.loop = asyncio.new_event_loop()
@@ -98,7 +127,7 @@ class WebSocketServer:
         client_id = str(uuid.uuid4())[:8]
         client_addr = websocket.remote_address
         self.clients[client_id] = {"websocket": websocket, "address": client_addr, "connected_at": time.time()}
-        authenticated = not self.password  # No password = auto-auth
+        authenticated = not self.password
 
         if self.signals:
             self.signals.client_connected.emit(f"{client_addr[0]}:{client_addr[1]}")
@@ -143,12 +172,8 @@ class WebSocketServer:
                             await self._send_clipboard(websocket)
                         elif msg_type == "list_files":
                             await self._send_file_list(websocket)
-                        elif msg_type == "get_file":
-                            pass  # Future: send file content
                     except json.JSONDecodeError:
                         pass
-                elif isinstance(message, bytes):
-                    pass  # Future: file upload
         except websockets.exceptions.ConnectionClosed:
             pass
         except Exception as e:
@@ -204,7 +229,6 @@ class WebSocketServer:
     def _process_clipboard(self, data):
         try:
             text = data.get("text", "")
-            # Set clipboard on Windows
             import subprocess
             subprocess.run(["clip"], input=text.encode("utf-16le"), check=True)
         except Exception as e:
@@ -243,14 +267,10 @@ class WebSocketServer:
                 if frame:
                     await websocket.send(frame)
                     frame_count += 1
-                    if frame_count % 30 == 0:
-                        stats = {"type": "stats", "fps": self.screen_capture.get_fps(), "frame": frame_count}
-                        await websocket.send(json.dumps(stats))
                 await asyncio.sleep(1.0 / self.screen_capture.fps)
             except websockets.exceptions.ConnectionClosed:
                 break
             except Exception as e:
-                print(f"Stream error: {e}")
                 break
 
     def get_client_count(self):

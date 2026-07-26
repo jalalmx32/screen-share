@@ -17,6 +17,7 @@ public class MainActivity extends Activity {
     
     private WebView webView;
     private Handler mainHandler;
+    private boolean atHome = true;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,26 +40,39 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient());
         webView.setBackgroundColor(0xFF0D1117);
         
+        // Add JavaScript interface for page tracking
+        webView.addJavascriptInterface(new Object() {
+            @android.webkit.JavascriptInterface
+            public void setPage(String page) {
+                runOnUiThread(() -> {
+                    atHome = "home".equals(page);
+                });
+            }
+        }, "Android");
+        
         webView.loadDataWithBaseURL(null, getHTML(), "text/html", "UTF-8", null);
     }
     
     @Override
     public void onBackPressed() {
-        // Always go home first
-        webView.evaluateJavascript("goHome()", value -> {
-            // Check if we're already at home
-            if (value != null && value.contains("\"home\"")) {
-                // At home - show exit dialog
-                runOnUiThread(() -> {
-                    new AlertDialog.Builder(MainActivity.this)
-                        .setTitle("Exit")
-                        .setMessage("Do you want to exit?")
-                        .setPositiveButton("Yes", (dialog, which) -> finish())
-                        .setNegativeButton("No", null)
-                        .show();
-                });
-            }
-        });
+        if (atHome) {
+            // At home - ask to exit
+            new AlertDialog.Builder(this)
+                .setTitle("Exit")
+                .setMessage("Do you want to exit?")
+                .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        finish();
+                    }
+                })
+                .setNegativeButton("No", null)
+                .show();
+        } else {
+            // Not at home - go to home
+            atHome = true;
+            webView.evaluateJavascript("goHome()", null);
+        }
     }
     
     @Override
@@ -86,6 +100,11 @@ public class MainActivity extends Activity {
         }
         
         return super.dispatchTouchEvent(event);
+    }
+    
+    // Called from JavaScript when navigating
+    public void setPage(String page) {
+        atHome = "home".equals(page);
     }
     
     private String getHTML() {
@@ -126,10 +145,19 @@ public class MainActivity extends Activity {
         ".btn-disconnect{background:#F87171;color:white;}" +
         ".btn-connecting{background:#FBBF24;color:#0D1117;}" +
 
+        /* Scan results */
+        ".scan-section{margin:8px;}" +
+        ".scan-title{color:#888;font-size:11px;margin-bottom:6px;}" +
+        ".scan-item{background:#161B22;border:1px solid #1a508b;border-radius:6px;padding:10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;}" +
+        ".scan-ip{color:#00D4FF;font-family:monospace;font-size:13px;}" +
+        ".scan-name{color:#888;font-size:10px;}" +
+        ".scan-connect{background:#00D4FF;border:none;color:#0D1117;padding:6px 12px;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;}" +
+        ".scan-refresh{background:none;border:1px solid #1a508b;color:#00D4FF;padding:6px 12px;border-radius:4px;font-size:11px;cursor:pointer;margin-top:6px;}" +
+        ".scan-status{color:#FBBF24;font-size:11px;}" +
+
         "#screen{flex:1;background:#000;display:none;position:relative;overflow:hidden;}" +
         "#screen.active{display:flex;flex-direction:column;}" +
         "#screenImg{width:100%;flex:1;object-fit:contain;}" +
-        ".touch-hint{text-align:center;color:#4ADE80;font-size:10px;padding:4px;}" +
 
         ".qwerty{background:#161B22;border-top:1px solid #1a508b;padding:4px;display:none;flex-direction:column;gap:3px;}" +
         ".qwerty.active{display:flex;}" +
@@ -197,33 +225,44 @@ public class MainActivity extends Activity {
         "    <h2>ScreenShare</h2>" +
         "    <div class='author'>by Jalal | <a href='https://t.me/x16_96'>@x16_96</a></div>" +
         "  </div>" +
-        "  <button class='sidebar-item' onclick='closeSidebar()'>Home</button>" +
+        "  <button class='sidebar-item' onclick='goHome()'>Home</button>" +
         "  <button class='sidebar-item' onclick='showPage(\"settingsPage\")'>Settings</button>" +
         "  <button class='sidebar-item' onclick='showPage(\"clipboardPage\")'>Clipboard</button>" +
         "  <button class='sidebar-item' onclick='showPage(\"historyPage\")'>History</button>" +
         "  <button class='sidebar-item' onclick='showPage(\"tutorialPage\")'>Tutorial</button>" +
         "  <button class='sidebar-item' onclick='showPage(\"aboutPage\")'>About</button>" +
-        "  <div class='sidebar-footer'>v2.3.0 | github.com/jalalmx32/screen-share</div>" +
+        "  <div class='sidebar-footer'>v2.4.0 | github.com/jalalmx32/screen-share</div>" +
         "</div>" +
 
+        /* HOME VIEW */
         "<div id='homeView'>" +
-        "  <div class='card' id='connectCard'>" +
+        "  <div class='card'>" +
         "    <input type='text' id='ipInput' placeholder='PC IP: 192.168.43.1:8765'>" +
         "    <input type='password' id='passInput' placeholder='Password (optional)'>" +
         "    <button id='toggleBtn' class='btn-connect' onclick='toggleConnection()'>Connect</button>" +
         "  </div>" +
         "  <div id='status' class='offline'>Offline</div>" +
+
+        /* AUTO SCAN */
+        "  <div class='scan-section' id='scanSection'>" +
+        "    <div class='scan-title'>Scanning for servers...</div>" +
+        "    <div id='scanList'></div>" +
+        "    <div class='scan-status' id='scanStatus'></div>" +
+        "    <button class='scan-refresh' onclick='startScan()'>Refresh</button>" +
+        "  </div>" +
+
         "  <div class='card' id='infoCard'>" +
         "    <div class='info'>" +
         "      <b>1.</b> Enable hotspot on Android<br>" +
         "      <b>2.</b> Connect PC to hotspot<br>" +
         "      <b>3.</b> Start ScreenShare on PC<br>" +
-        "      <b>4.</b> Enter IP and tap Connect<br>" +
+        "      <b>4.</b> Enter IP or tap detected server<br>" +
         "      <b>5.</b> Touch to control PC!" +
         "    </div>" +
         "  </div>" +
         "</div>" +
 
+        /* SCREEN VIEW */
         "<div id='screenView' style='display:none;flex:1;flex-direction:column;'>" +
         "  <img id='screenImg'>" +
         "  <div class='special-bar'>" +
@@ -290,21 +329,19 @@ public class MainActivity extends Activity {
         "  </div>" +
         "</div>" +
 
+        /* PAGES */
         "<div class='page' id='settingsPage'>" +
         "  <div class='page-header'><h3>Settings</h3><button class='page-back' onclick='goHome()'>Back</button></div>" +
         "  <div class='page-content'>" +
         "    <h4>Display</h4>" +
         "    <div class='setting-item'><div class='setting-label'>Quality</div>" +
-        "      <select id='setQuality' onchange='saveSetting(\"quality\",this.value)' style='width:100px;'>" +
+        "      <select id='setQuality' style='width:100px;'>" +
         "        <option value='1080p'>1080p</option><option value='720p' selected>720p</option><option value='480p'>480p</option>" +
         "      </select></div>" +
         "    <div class='setting-item'><div class='setting-label'>Frame Rate</div>" +
-        "      <select id='setFPS' onchange='saveSetting(\"fps\",this.value)' style='width:100px;'>" +
+        "      <select id='setFPS' style='width:100px;'>" +
         "        <option value='15'>15</option><option value='30' selected>30</option><option value='60'>60</option>" +
         "      </select></div>" +
-        "    <h4>Input</h4>" +
-        "    <div class='setting-item'><div class='setting-label'>Show Keyboard</div>" +
-        "      <label class='toggle'><input type='checkbox' id='setKB' checked><span class='slider'></span></label></div>" +
         "  </div>" +
         "</div>" +
 
@@ -330,7 +367,7 @@ public class MainActivity extends Activity {
         "  <div class='step'><div class='step-num'>1</div><div class='step-title'>Enable Hotspot</div><div class='step-desc'>Turn on WiFi hotspot</div></div>" +
         "  <div class='step'><div class='step-num'>2</div><div class='step-title'>Connect PC</div><div class='step-desc'>Connect PC to hotspot</div></div>" +
         "  <div class='step'><div class='step-num'>3</div><div class='step-title'>Start Server</div><div class='step-desc'>Run ScreenShare on Windows</div></div>" +
-        "  <div class='step'><div class='step-num'>4</div><div class='step-title'>Connect</div><div class='step-desc'>Enter IP and tap Connect</div></div>" +
+        "  <div class='step'><div class='step-num'>4</div><div class='step-title'>Auto Detect</div><div class='step-desc'>App auto-detects servers, or enter IP manually</div></div>" +
         "  <div class='step'><div class='step-num'>5</div><div class='step-title'>Touch</div><div class='step-desc'>Tap to click, drag to move</div></div>" +
         "  <div class='step'><div class='step-num'>6</div><div class='step-title'>Keyboard</div><div class='step-desc'>Use QWERTY or special keys</div></div>" +
         "</div>" +
@@ -338,7 +375,7 @@ public class MainActivity extends Activity {
         "<div class='page' id='aboutPage'>" +
         "  <div class='page-header'><h3>About</h3><button class='page-back' onclick='goHome()'>Back</button></div>" +
         "  <div class='page-content'>" +
-        "    <h4>ScreenShare v2.3.0</h4>" +
+        "    <h4>ScreenShare v2.4.0</h4>" +
         "    <p>Wireless Display + Touch Control</p>" +
         "    <p>A free alternative to Spacedesk</p>" +
         "    <h4>Developer</h4>" +
@@ -348,9 +385,14 @@ public class MainActivity extends Activity {
         "</div>" +
 
         "<script>" +
-        "var ws=null;var isConnected=false;" +
+        "var ws=null;var isConnected=false;var scanTimer=null;var scannedHosts=[];" +
 
-        "(function(){try{var s=JSON.parse(localStorage.getItem('ss')||'{}');if(s.ip)document.getElementById('ipInput').value=s.ip;if(s.pass)document.getElementById('passInput').value=s.pass;}catch(e){}})();" +
+        /* INIT */
+        "(function(){" +
+        "  try{var s=JSON.parse(localStorage.getItem('ss')||'{}');if(s.ip)document.getElementById('ipInput').value=s.ip;if(s.pass)document.getElementById('passInput').value=s.pass;}catch(e){}" +
+        "  loadHistory();" +
+        "  startScan();" +
+        "})();" +
 
         "function save(k,v){var s=JSON.parse(localStorage.getItem('ss')||'{}');s[k]=v;localStorage.setItem('ss',JSON.stringify(s));}" +
 
@@ -358,21 +400,75 @@ public class MainActivity extends Activity {
         "function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebarOverlay').classList.add('active');}" +
         "function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebarOverlay').classList.remove('active');}" +
 
-        /* PAGES */
-        "function showPage(id){closeSidebar();document.getElementById(id).classList.add('active');}" +
-
-        /* GO HOME - closes everything, returns to main screen */
+        /* GO HOME */
         "function goHome(){" +
         "  closeSidebar();" +
         "  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});" +
+        "  document.getElementById('homeView').style.display='block';" +
+        "  document.getElementById('screenView').style.display='none';" +
+        "  try{Android.setPage('home');}catch(e){}" +
         "  if(isConnected){" +
         "    if(ws){ws.close();ws=null;}" +
         "    isConnected=false;" +
-        "    document.getElementById('homeView').style.display='block';" +
-        "    document.getElementById('screenView').style.display='none';" +
         "    setBtn('Connect','btn-connect');setStatus('Offline','offline');" +
         "  }" +
-        "  return 'home';" +
+        "}" +
+
+        "function showPage(id){closeSidebar();document.getElementById(id).classList.add('active');document.getElementById('homeView').style.display='block';document.getElementById('screenView').style.display='none';try{Android.setPage('page');}catch(e){}}" +
+
+        /* AUTO SCAN - try common IPs on the network */
+        "function startScan(){" +
+        "  scannedHosts=[];" +
+        "  document.getElementById('scanStatus').textContent='Scanning...';" +
+        "  document.getElementById('scanList').innerHTML='';" +
+
+        /* Get base IP from input or guess common ones */
+        "  var baseIP='192.168.';" +
+        "  var ip=document.getElementById('ipInput').value.trim();" +
+        "  if(ip){" +
+        "    var parts=ip.split('.');" +
+        "    if(parts.length>=3)baseIP=parts[0]+'.'+parts[1]+'.';" +
+        "  }" +
+
+        /* Try common last octets */
+        "  var hosts=[];" +
+        "  for(var i=1;i<=20;i++)hosts.push(baseIP+'1.'+i);" +
+        "  hosts.push(baseIP+'0.1');hosts.push(baseIP+'0.100');" +
+        "  hosts.push(baseIP+'1.1');hosts.push(baseIP+'1.100');" +
+        "  hosts.push(baseIP+'43.1');hosts.push(baseIP+'43.100');" +
+        "  hosts.push(baseIP+'50.1');hosts.push(baseIP+'100.1');" +
+        "  hosts.push('127.0.0.1');" +
+
+        "  var found=0;var checked=0;" +
+        "  hosts.forEach(function(h){" +
+        "    var url='ws://'+h+':8765';" +
+        "    try{" +
+        "      var t=new WebSocket(url);" +
+        "      var host=h;" +
+        "      var timer=setTimeout(function(){t.close();checked++;if(checked>=hosts.length)scanDone(found);},1500);" +
+        "      t.onopen=function(){" +
+        "        clearTimeout(timer);found++;checked++;" +
+        "        scannedHosts.push(host);" +
+        "        addScanItem(host);" +
+        "        t.close();" +
+        "        if(checked>=hosts.length)scanDone(found);" +
+        "      };" +
+        "      t.onerror=function(){clearTimeout(timer);checked++;if(checked>=hosts.length)scanDone(found);};" +
+        "    }catch(e){checked++;}" +
+        "  });" +
+        "}" +
+
+        "function scanDone(found){" +
+        "  document.getElementById('scanStatus').textContent=found>0?'Found '+found+' server(s)':'No servers found. Enter IP manually.';" +
+        "}" +
+
+        "function addScanItem(ip){" +
+        "  var el=document.getElementById('scanList');" +
+        "  var d=document.createElement('div');d.className='scan-item';" +
+        "  d.innerHTML='<div><div class=scan-ip>'+ip+'</div><div class=scan-name>ScreenShare Server</div></div>';" +
+        "  var btn=document.createElement('button');btn.className='scan-connect';btn.textContent='Connect';" +
+        "  btn.onclick=function(){document.getElementById('ipInput').value=ip+':8765';toggleConnection();};" +
+        "  d.appendChild(btn);el.appendChild(d);" +
         "}" +
 
         /* CONNECTION */
@@ -382,6 +478,7 @@ public class MainActivity extends Activity {
         "    document.getElementById('homeView').style.display='block';" +
         "    document.getElementById('screenView').style.display='none';" +
         "    setBtn('Connect','btn-connect');setStatus('Offline','offline');" +
+        "    try{Android.setPage('home');}catch(e){}" +
         "  }else{" +
         "    var ip=document.getElementById('ipInput').value.trim();" +
         "    if(!ip){alert('Enter IP');return;}" +
@@ -397,6 +494,7 @@ public class MainActivity extends Activity {
         "        setStatus('Connected','online');setBtn('Disconnect','btn-disconnect');" +
         "        document.getElementById('homeView').style.display='none';" +
         "        document.getElementById('screenView').style.display='flex';" +
+        "        try{Android.setPage('screen');}catch(e){}" +
         "        saveHistory(ip);" +
         "      };" +
         "      ws.onmessage=function(e){" +
