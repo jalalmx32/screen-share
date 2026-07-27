@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
             public void log(String m) { android.util.Log.d("SS", m); }
         }, "Android");
 
-        webView.loadUrl("file:///android_asset/index.html");
+        webView.loadDataWithBaseURL(null, H(), "text/html", "UTF-8", null);
     }
 
     @Override
@@ -284,7 +284,7 @@ public class MainActivity extends Activity {
 
         // CONNECTION - THE KEY FIX
         + "function toggleConnection(e){if(e)e.preventDefault();dbg('toggle');"
-        + "if(isConnected){isConnected=false;atHome=true;if(ws){try{ws.close();}catch(x){}ws=null;}document.getElementById('homeView').style.display='flex';document.getElementById('screenView').style.display='none';setBtn('Connect','btn-connect');setStatus('Offline','offline');resetView();try{Android.setPage('home');}catch(e){}}"
+        + "if(isConnected){if(ws){try{ws.close();}catch(x){}ws=null;}isConnected=false;atHome=true;document.getElementById('homeView').style.display='flex';document.getElementById('screenView').style.display='none';setBtn('Connect','btn-connect');setStatus('Offline','offline');resetView();try{Android.setPage('home');}catch(e){}}"
         + "else{var ip='';try{ip=document.getElementById('ipInput').value.trim();}catch(x){}dbg('IP=['+ip+']');if(!ip){dbg('No IP');return;}"
         + "if(ip.indexOf(':')===-1)ip+=':8765';var pass='';try{pass=document.getElementById('passInput').value;}catch(x){}"
         + "try{save('ip',ip);save('pass',pass);}catch(x){}"
@@ -292,11 +292,11 @@ public class MainActivity extends Activity {
         + "try{ws=new WebSocket('ws://'+ip);ws.binaryType='arraybuffer';dbg('WS created');"
         + "ws.onopen=function(){dbg('CONNECTED');if(pass)ws.send(JSON.stringify({type:'auth',password:pass}));isConnected=true;atHome=false;setStatus('Connected!','online');setBtn('Disconnect','btn-disconnect');document.getElementById('homeView').style.display='none';document.getElementById('screenView').style.display='flex';try{Android.setPage('screen');}catch(e){}saveHistory(ip);canvasEl=document.getElementById('screenCanvas');if(canvasEl)ctx=canvasEl.getContext('2d');dbg('Screen ready');};"
 
-        // IMAGE HANDLER - USE CANVAS
-        + "ws.onmessage=function(e){if(e.data instanceof ArrayBuffer){try{var b=new Blob([e.data],{type:'image/jpeg'});var u=URL.createObjectURL(b);var tmp=new Image();tmp.onload=function(){if(canvasEl&&ctx){canvasEl.width=tmp.width;canvasEl.height=tmp.height;ctx.drawImage(tmp,0,0);dbg('Frame '+tmp.width+'x'+tmp.height);}URL.revokeObjectURL(u);};tmp.onerror=function(){dbg('Img load err');URL.revokeObjectURL(u);};tmp.src=u;}catch(ex){dbg('ERR:'+ex.message);}}else{dbg('TXT:'+e.data.substring(0,60));}};"
+        // IMAGE HANDLER - USE CANVAS + FileReader (not Blob URL)
+        + "ws.onmessage=function(e){if(e.data instanceof ArrayBuffer){try{var blob=new Blob([e.data],{type:'image/jpeg'});var reader=new FileReader();reader.onloadend=function(){if(canvasEl&&ctx){var tmp=new Image();tmp.onload=function(){canvasEl.width=tmp.width;canvasEl.height=tmp.height;ctx.drawImage(tmp,0,0);dbg('Frame '+tmp.width+'x'+tmp.height);};tmp.onerror=function(){dbg('Img err');};tmp.src=reader.result;}else{dbg('No canvas');}};reader.readAsDataURL(blob);}catch(ex){dbg('ERR:'+ex.message);}}else{dbg('TXT:'+e.data.substring(0,60));}};"
 
-        + "ws.onclose=function(e){dbg('Closed:'+e.code);isConnected=false;goHome();};"
-        + "ws.onerror=function(){dbg('WS Error');isConnected=false;goHome();};"
+        + "ws.onclose=function(e){dbg('Closed:'+e.code);goHome();};"
+        + "ws.onerror=function(){dbg('WS Error');goHome();};"
         + "}catch(ex){dbg('Exc:'+ex.message);goHome();}}}"
 
         + "function setBtn(t,c){var b=document.getElementById('toggleBtn');b.textContent=t;b.className=c;}"
