@@ -145,7 +145,7 @@ public class MainActivity extends Activity {
         + ".footer .nm{color:#e0e0e0;font-size:12px;}.footer .nm b{color:#00D4FF;}"
         + "#screenView{display:none;flex-direction:column;overflow:hidden;position:fixed;top:40px;left:0;right:0;bottom:0;background:#000;z-index:100;}"
         + "#screenContainer{flex:1;overflow:hidden;position:relative;touch-action:none;min-height:0;}"
-        + "#screenCanvas{width:100%;height:100%;display:block;background:#000;touch-action:none;}"
+        + "#screenImg{width:100%;height:100%;object-fit:contain;display:block;background:#000;}"
         + ".controls-bar{background:#161B22;border-top:1px solid #1a508b;padding:4px 6px;display:flex;flex-wrap:wrap;gap:3px;justify-content:center;flex-shrink:0;}"
         + ".ctrl-key{background:#0f3460;border:1px solid #1a508b;border-radius:3px;color:white;padding:5px 6px;font-size:9px;text-align:center;min-width:30px;}"
         + ".ctrl-key:active{background:#00D4FF;color:#0D1117;}"
@@ -210,7 +210,7 @@ public class MainActivity extends Activity {
 
         // SCREEN
         + "<div id='screenView'>"
-        + "<div id='screenContainer'><canvas id='screenCanvas'></canvas></div>"
+        + "<div id='screenContainer'><img id='screenImg' style='width:100%;height:100%;object-fit:contain;display:block;background:#000;'></div>"
         + "<div class='controls-bar'>"
         + "<div class='ctrl-key special' ontouchstart='sendKey(event,\"win\")'>Win</div>"
         + "<div class='ctrl-key special' ontouchstart='sendKey(event,\"alt\")'>Alt</div>"
@@ -270,7 +270,7 @@ public class MainActivity extends Activity {
         + "lc.addEventListener('touchstart',function(e){if(e.touches.length===2){pinch=true;drag=false;var dx=e.touches[0].clientX-e.touches[1].clientX;var dy=e.touches[0].clientY-e.touches[1].clientY;lastDist=Math.sqrt(dx*dx+dy*dy);e.preventDefault();}else if(e.touches.length===1){drag=true;lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;}},{passive:false});"
         + "lc.addEventListener('touchmove',function(e){if(pinch&&e.touches.length===2){var dx=e.touches[0].clientX-e.touches[1].clientX;var dy=e.touches[0].clientY-e.touches[1].clientY;var d=Math.sqrt(dx*dx+dy*dy);zoom=Math.max(0.5,Math.min(5,zoom*(d/lastDist)));lastDist=d;updateTransform();e.preventDefault();}else if(drag&&e.touches.length===1&&!pinch){panX+=e.touches[0].clientX-lastX;panY+=e.touches[0].clientY-lastY;lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;updateTransform();e.preventDefault();}},{passive:false});"
         + "lc.addEventListener('touchend',function(e){if(e.touches.length<2)pinch=false;if(e.touches.length===0)drag=false;});})();"
-        + "function updateTransform(){if(canvasEl)canvasEl.style.transform='translate('+panX+'px,'+panY+'px) scale('+zoom+')';}"
+        + "function updateTransform(){var el=document.getElementById('screenImg');if(el)el.style.transform='translate('+panX+'px,'+panY+'px) scale('+zoom+')';}"
         + "function resetView(){zoom=1;panX=0;panY=0;updateTransform();}"
 
         // SCAN
@@ -290,10 +290,10 @@ public class MainActivity extends Activity {
         + "try{save('ip',ip);save('pass',pass);}catch(x){}"
         + "setStatus('Connecting...','connecting');setBtn('Connecting...','btn-connecting');dbg('Connecting ws://'+ip);"
         + "try{ws=new WebSocket('ws://'+ip);ws.binaryType='arraybuffer';dbg('WS created');"
-        + "ws.onopen=function(){dbg('CONNECTED');if(pass)ws.send(JSON.stringify({type:'auth',password:pass}));isConnected=true;atHome=false;setStatus('Connected!','online');setBtn('Disconnect','btn-disconnect');document.getElementById('homeView').style.display='none';document.getElementById('screenView').style.display='flex';try{Android.setPage('screen');}catch(e){}saveHistory(ip);canvasEl=document.getElementById('screenCanvas');if(canvasEl)ctx=canvasEl.getContext('2d');dbg('Screen ready');};"
+        + "ws.onopen=function(){dbg('CONNECTED');if(pass)ws.send(JSON.stringify({type:'auth',password:pass}));isConnected=true;atHome=false;setStatus('Connected!','online');setBtn('Disconnect','btn-disconnect');document.getElementById('homeView').style.display='none';document.getElementById('screenView').style.display='flex';try{Android.setPage('screen');}catch(e){}saveHistory(ip);dbg('Screen ready');};"
 
-        // IMAGE HANDLER - USE CANVAS + FileReader (not Blob URL)
-        + "ws.onmessage=function(e){if(e.data instanceof ArrayBuffer){try{var blob=new Blob([e.data],{type:'image/jpeg'});var reader=new FileReader();reader.onloadend=function(){if(canvasEl&&ctx){var tmp=new Image();tmp.onload=function(){canvasEl.width=tmp.width;canvasEl.height=tmp.height;ctx.drawImage(tmp,0,0);dbg('Frame '+tmp.width+'x'+tmp.height);};tmp.onerror=function(){dbg('Img err');};tmp.src=reader.result;}else{dbg('No canvas');}};reader.readAsDataURL(blob);}catch(ex){dbg('ERR:'+ex.message);}}else{dbg('TXT:'+e.data.substring(0,60));}};"
+        // IMAGE HANDLER - SIMPLE BASE64 + IMG (most reliable)
+        + "var frameCount=0;ws.onmessage=function(e){try{if(e.data instanceof ArrayBuffer){frameCount++;var bytes=new Uint8Array(e.data);var bin='';for(var i=0;i<bytes.length;i++)bin+=String.fromCharCode(bytes[i]);var b64=btoa(bin);var imgEl=document.getElementById('screenImg');if(imgEl){imgEl.src='data:image/jpeg;base64,'+b64;if(frameCount%30===0)dbg('Frame#'+frameCount+' '+bytes.length+'B');}else{dbg('No imgEl');}}else{dbg('TXT:'+e.data.substring(0,80));}}catch(ex){dbg('ERR:'+ex.message);}};"
 
         + "ws.onclose=function(e){dbg('Closed:'+e.code);goHome();};"
         + "ws.onerror=function(){dbg('WS Error');goHome();};"
